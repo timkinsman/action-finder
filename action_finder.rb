@@ -1,14 +1,12 @@
+# frozen_string_literal: true
+
 require 'octokit'
 
-def checkIfExists(owner, repo)
-    begin  
-        pp Octokit.contents("#{owner}/#{repo}", path: '.github/workflows')
-    rescue
-        puts '.github/workflows does not exist'
-    ensure
-        puts 'end'
-    end
+def check_if_exists(owner, repo)
+	pp Octokit.contents("#{owner}/#{repo}", path: '.github/workflows')
+	rescue
+		puts ".github/workflows does not exist in #{owner}/#{repo}"
 end
 
-checkIfExists('timkinsman', 'octofile')
-checkIfExists('timkinsman', 'topify')
+check_if_exists('timkinsman', 'octofile')
+check_if_exists('timkinsman', 'topify')
