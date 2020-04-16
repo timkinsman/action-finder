@@ -9,7 +9,7 @@ const checkIfFileExists = async (owner, repo) => {
 			path:'.github/workflows'
 		}).then(({data}) => {
 			console.log(data)
-		})
+		}).catch(() => console.log('catch'))
 	} catch (error) {
 		if (error.status === 404) {
 			console.log('.github/workflows does not exist')
