@@ -4,7 +4,7 @@ require 'octokit'
 
 def check_if_exists(owner, repo)
   pp Octokit.contents("#{owner}/#{repo}", path: '.github/workflows')
-rescue
+rescue StandardError
   puts ".github/workflows does not exist in #{owner}/#{repo}"
 end
 
