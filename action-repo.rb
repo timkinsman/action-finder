@@ -14,7 +14,7 @@ def check_if_exists(client, file, index)
   rescue StandardError
     progressbar.increment
   end
-  puts "#{file}: #{arr.length} out of 5000 (#{((arr.length/5000.00)*100).ceil()}%) use GitHub Actions"
+  puts "#{file}: #{arr.length} out of 5000 (#{((arr.length/5000.00)*100).round(2)}%) use GitHub Actions"
   CSV.open("./result-files/result-files-#{index}.csv", "w") do |csv|
     arr.each do |row|
       csv << row
@@ -24,7 +24,7 @@ end
 
 def create_client(login, password)
   client = Octokit::Client.new(login: login, password: password)
-  abort_msg = "API rate limit exceeded. (#{client.rate_limit().resets_in} seconds remaining.)"
+  abort_msg = "API rate limit exceeded. (#{client.rate_limit().resets_in} seconds remaining to refresh.)"
   abort(abort_msg) unless client.rate_limit().remaining == 5000
   client
 rescue StandardError
