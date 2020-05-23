@@ -2,42 +2,63 @@
 
 require 'csv'
 require 'octokit'
-require 'ruby-progressbar'
 
-def check_if_exists(client, file, index)
-  progressbar = ProgressBar.create(format: '%a |%b>>%i| %p%% %t', total: 5000)
-  arr = []
-  CSV.foreach(file) do |row|
-    client.contents("#{row[0]}", path: '.github/workflows')
-    arr << row
-    progressbar.increment
-  rescue StandardError
-    progressbar.increment
-  end
-  puts "#{file}: #{arr.length} out of 5000 (#{((arr.length/5000.00)*100).round(2)}%) use GitHub Actions"
-  CSV.open("./result-files/result-files-#{index}.csv", "w") do |csv|
-    arr.each do |row|
-      csv << row
+client = Octokit::Client.new(login: ARGV[0], password: ARGV[1])
+
+puts 'Attempting to login.'
+
+begin
+  client.user
+rescue StandardError
+  abort('-Login unsuccessful (401 - Bad credentials)')
+end
+
+puts '-Login successful.'
+puts 'Preparing to dig through 446843 repositories.'
+puts '-Prepared to dig.'
+
+time = Time.new
+puts "Started digging at Current Time : #{time.inspect}"
+
+active_repositories = 0
+
+CSV.open("./out.csv", "w") do |csv|
+  csv << ["repository", "workflows"]
+  CSV.foreach("dataset-f.csv").with_index do |row, i|
+    begin
+      print "Digging through #{i} of 446843 (#{client.rate_limit().remaining} rate limited requests remaining)\r"
+      $stdout.flush
+      client = Octokit::Client.new(login: ARGV[0], password: ARGV[1])
+      if client.rate_limit.remaining <= 0
+        resets_in = client.rate_limit().resets_in + 60
+        puts ''
+        resets_in.times do |t|
+          print "-Refreshing rate limit - resets in #{resets_in - t - 1} seconds.\r"
+          $stdout.flush
+          sleep(1)
+        end
+        puts ''
+        puts '--Resuming'
+        redo
+      end
+      if client.repository?(row[0])
+        active_repositories += 1
+        workflows = client.contents(row[0], path: ".github/workflows")
+        arr = []
+        workflows.each do |wf|
+          arr << wf.name if File.extname(wf.name) == ".yml" || File.extname(wf.name) == '.yaml'
+        end
+        csv << [row[0], arr, arr.length] unless arr.empty?
+      end
+    rescue StandardError
+      next
     end
   end
+  puts ''
+  puts 'Completed.'
 end
 
-def create_client(login, password)
-  client = Octokit::Client.new(login: login, password: password)
-  abort_msg = "API rate limit exceeded. (#{client.rate_limit().resets_in} seconds remaining to refresh.)"
-  abort(abort_msg) unless client.rate_limit().remaining == 5000
-  client
-rescue StandardError
-  abort("Incorrect GitHub username or password. Please try again.")
-end
+time = Time.new
+puts "Finished digging at Current Time : #{time.inspect}"
 
-def run()
-  client = create_client(ARGV[0], ARGV[1])
-  for index in 0..89
-    check_if_exists(client, "./split-files/split-files-#{index}.csv", index)
-    puts "Sleeping for #{client.rate_limit().resets_in + 300} seconds."
-    sleep client.rate_limit().resets_in + 300
-  end
-end
-
-run()
+puts "#{active_repositories} of 446843 repositories are active"
