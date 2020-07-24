@@ -38,5 +38,3 @@ def find_workflows(user, pass, input, output)
 
   spinner.success
 end
-
-find_workflows(ARGV[0], ARGV[1], ARGV[2], ARGV[3])

@@ -15,5 +15,3 @@ def filter_predicted(input, output)
   end
   spinner.success
 end
-
-filter_predicted(ARGV[0], ARGV[1])

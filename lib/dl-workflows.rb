@@ -34,5 +34,3 @@ def dl_workflows(user, pass, input, output)
     spinner.success
   end
 end
-
-dl_workflows('timkinsman', '6f]tdPAammHd', 'test.csv', 'workflows')

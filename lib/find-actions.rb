@@ -4,3 +4,4 @@ require 'csv'
 require 'tty-spinner'
 
 def find_actions(input)
+end
