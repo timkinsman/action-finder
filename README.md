@@ -10,7 +10,3 @@ In the project directory, you can run:
 
 Installs the gems required for action-finder.<br />
 See Gemfile for the listed gems.
-
-### `ruby action-repo _github_login _github_password`
-
-Runs the program.
