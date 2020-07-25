@@ -4,7 +4,7 @@ require 'csv'
 require 'tty-spinner'
 
 def filter_predicted(input, output)
-  spinner = TTY::Spinner.new("[:spinner] Filtering ...", format: :classic)
+  spinner = TTY::Spinner.new("[:spinner] Filtering dataset ...", format: :classic)
   spinner.auto_spin
   CSV.open(output, "w") do |csv|
     CSV.foreach(input).with_index do |row, i|
