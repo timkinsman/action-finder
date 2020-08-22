@@ -10,13 +10,13 @@ def rank_actions(dir, input, output)
   CSV.open(output, "w") do |csv|
     csv << ['action', '#appearences']
     CSV.foreach(input).with_index do |row|
-      actions = row[3].tr('[\"]', '').split(', ')
+      actions = row[3].tr('[\'"]', '').tr('\\', '').split(', ')
       nested_actions << actions
     end
     nested_actions = nested_actions.flatten(1)
     to_hash = nested_actions.group_by(&:itself).transform_values(&:count)
     to_hash.each do |k,v|
-      csv << [k, v]
+      csv << [k, v] if !k.start_with?('./', '#')
     end
   end
   spinner.success

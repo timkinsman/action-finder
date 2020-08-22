@@ -29,7 +29,12 @@ def find_actions(dir, output)
             File.open(file) do |contents|
               contents.each_line do |line|
                 if line =~ /uses:/
-                  action << line.split(' ')[-1]
+                  splitted = line.split(' ')[-1]
+                  if splitted.start_with?('docker')
+                    action << splitted.rpartition(':')[0]
+                  else
+                    action << splitted.split('@')[0]
+                  end
                 end
               end
               actions << action

@@ -11,5 +11,5 @@ require_relative 'lib/rank-actions'
 #filter_predicted("#{ARGV[2]}/dataset.csv", "#{ARGV[2]}/dataset-f.csv")
 #find_workflows(ARGV[0], ARGV[1], "#{ARGV[2]}/dataset-f.csv", "#{ARGV[2]}/workflows.csv")
 #dl_workflows(ARGV[0], ARGV[1], "#{ARGV[2]}/workflows.csv", "#{ARGV[2]}/workflows")
-#find_actions(ARGV[2], "#{ARGV[2]}/actions.csv")
+find_actions(ARGV[2], "#{ARGV[2]}/actions.csv")
 rank_actions(ARGV[2], "#{ARGV[2]}/actions.csv", "#{ARGV[2]}/actions-r.csv")
