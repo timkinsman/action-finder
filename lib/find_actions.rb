@@ -4,20 +4,20 @@ require 'csv'
 require 'tty-spinner'
 
 def find_actions(dir, output)
-  spinner = TTY::Spinner.new("[:spinner] Finding actions ...", format: :classic)
+  spinner = TTY::Spinner.new('[:spinner] Finding actions ...', format: :classic)
   spinner.auto_spin
 
-  CSV.open(output, "w") do |csv|
+  CSV.open(output, 'w') do |csv|
     Dir.foreach("#{dir}/workflows") do |user|
-      next if user == '.' or user == '..'
+      next if user == '.' || user == '..'
 
       Dir.foreach("#{dir}/workflows/#{user}") do |repo|
-        next if repo == '.' or repo == '..'
-        row = workflows = actions = num_actions = []
+        next if repo == '.' || repo == '..'
+        row, workflows, actions, num_actions = [], [], [], []
         row[0] = "#{user}/#{repo}"
 
         Dir.foreach("#{dir}/workflows/#{user}/#{repo}") do |workflow|
-          next if workflow == '.' or workflow == '..'
+          next if workflow == '.' || workflow == '..'
           workflows << workflow
 
           Dir.glob("#{dir}/workflows/#{user}/#{repo}/#{workflow}") do |file|

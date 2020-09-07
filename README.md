@@ -9,4 +9,4 @@ In the project directory, you can run:
 Installs the gems required for action-repo.<br />
 See Gemfile for the listed gems.
 
-### `ruby action-repo {GITHUB_USERNAME} {GITHUB_PASSWORD} {OUTPUT_DIR}`
+### `ruby action_repo {GITHUB_USERNAME} {GITHUB_PASSWORD} {OUTPUT_DIR}`
