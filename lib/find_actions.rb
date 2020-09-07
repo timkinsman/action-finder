@@ -17,20 +17,19 @@ def find_actions(dir, output)
         row[0] = "#{user}/#{repo}"
 
         Dir.foreach("#{dir}/workflows/#{user}/#{repo}") do |workflow|
-          next if workflow == '.' || workflow == '..'
+          next if workflow == '.' or workflow == '..'
           workflows << workflow
 
           Dir.glob("#{dir}/workflows/#{user}/#{repo}/#{workflow}") do |file|
             action = []
             File.open(file) do |contents|
               contents.each_line do |line|
-                if line =~ /uses:/
-                  splitted = line.split(' ')[-1]
-                  if splitted.start_with?('docker')
-                    action << splitted.rpartition(':')[0]
-                  else
-                    action << splitted.split('@')[0]
-                  end
+                next if line =~ /uses:/
+                splitted = line.split(' ')[-1]
+                if splitted.start_with?('docker')
+                  action << splitted.rpartition(':')[0]
+                else
+                  action << splitted.split('@')[0]
                 end
               end
               actions << action
@@ -46,6 +45,6 @@ def find_actions(dir, output)
       end
     end
   end
-  
+
   spinner.success
 end

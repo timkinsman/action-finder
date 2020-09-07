@@ -10,10 +10,10 @@ dataset_filtered_path = "#{ARGV[2]}/dataset_filtered.csv"
 actions_path = "#{ARGV[2]}/actions.csv"
 
 # download dataset from reporeapers.github.io
-#dl_dataset(ARGV[2])
+# dl_dataset(ARGV[2])
 
 # filter dataset to repositories that scored 1 in either randomforest_org or randomforest_utl
-#filter_dataset("#{ARGV[2]}/dataset.csv", dataset_filtered_path)
+# filter_dataset("#{ARGV[2]}/dataset.csv", dataset_filtered_path)
 
 # find which repositories exist and have workflow files
 find_workflows(ARGV[0], ARGV[1], dataset_filtered_path, "#{ARGV[2]}/workflows.csv", "#{ARGV[2]}/workflows")
@@ -22,4 +22,4 @@ find_workflows(ARGV[0], ARGV[1], dataset_filtered_path, "#{ARGV[2]}/workflows.cs
 find_actions(ARGV[2], actions_path)
 
 # rank the github actions
-rank_actions(ARGV[2], actions_path, "#{ARGV[2]}/actions-ranked.csv")
+rank_actions(actions_path, "#{ARGV[2]}/actions-ranked.csv")

@@ -8,7 +8,7 @@ def filter_dataset(input, output)
   spinner.auto_spin
 
   CSV.open(output, 'w') do |csv|
-    CSV.foreach(input).with_index do |row|
+    CSV.foreach(input) do |row|
       csv << [row[0]] if row[13] == '1' || row[15] == '1'
     end
   end
