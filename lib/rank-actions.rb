@@ -6,9 +6,9 @@ require 'tty-spinner'
 def rank_actions(dir, input, output)
   spinner = TTY::Spinner.new("[:spinner] Ranking actions ...", format: :classic)
   spinner.auto_spin
+
   nested_actions = []
   CSV.open(output, "w") do |csv|
-    csv << ['action', '#appearences']
     CSV.foreach(input).with_index do |row|
       actions = row[3].tr('[\'"]', '').tr('\\', '').split(', ')
       nested_actions << actions
@@ -19,5 +19,6 @@ def rank_actions(dir, input, output)
       csv << [k, v] if !k.start_with?('./', '#')
     end
   end
+  
   spinner.success
 end

@@ -1,12 +1,12 @@
 Discover which repos use GitHub Actions within the RepoReaper dataset.<br />
 
-Download an unzip the dataset.csv from https://reporeapers.github.io/results/1.html to the project root directory.
-
 ## Available Commands
 
 In the project directory, you can run:
 
 ### `bundle install`
 
-Installs the gems required for action-finder.<br />
+Installs the gems required for action-repo.<br />
 See Gemfile for the listed gems.
+
+### `ruby action-repo {GITHUB_USERNAME} {GITHUB_PASSWORD} {OUTPUT_DIR}`

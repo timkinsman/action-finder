@@ -8,16 +8,12 @@ def find_actions(dir, output)
   spinner.auto_spin
 
   CSV.open(output, "w") do |csv|
-    csv << ['repository', 'workflows', '#workflows', 'actions', '#actions']
     Dir.foreach("#{dir}/workflows") do |user|
       next if user == '.' or user == '..'
 
       Dir.foreach("#{dir}/workflows/#{user}") do |repo|
         next if repo == '.' or repo == '..'
-        row = []
-        workflows = []
-        actions = []
-        num_actions = []
+        row = workflows = actions = num_actions = []
         row[0] = "#{user}/#{repo}"
 
         Dir.foreach("#{dir}/workflows/#{user}/#{repo}") do |workflow|
