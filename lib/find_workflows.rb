@@ -30,11 +30,11 @@ def find_workflows(user, pass, input, output, dir)
         if client.repository?(row[0])
           workflows = client.contents(row[0], path: '.github/workflows')
           arr = []
-          FileUtils.mkdir_p "#{dir}/#{row[0]}"
           workflows.each do |wf|
-            next if File.extname(wf.name) == '.yml' || File.extname(wf.name) == '.yaml'
+            next if !(File.extname(wf.name) == '.yml' || File.extname(wf.name) == '.yaml')
             arr << wf.name
             begin
+              FileUtils.mkdir_p "#{dir}/#{row[0]}" unless File.exist?("#{dir}/#{row[0]}")
               download = URI.open(wf.download_url)
               IO.copy_stream(download, "#{dir}/#{row[0]}/#{wf.name}")
             rescue StandardError
