@@ -7,7 +7,9 @@ def find_actions(dir, output)
   spinner = TTY::Spinner.new('[:spinner] Finding actions ...', format: :classic)
   spinner.auto_spin
 
+  commented_out = 0  
   CSV.open(output, 'w') do |csv|
+    csv << ["repository", "workflow_files", "workflow_files_count", "actions", "actions_count"]
     Dir.foreach("#{dir}/workflows") do |user|
       next if user == '.' || user == '..'
 
@@ -24,10 +26,18 @@ def find_actions(dir, output)
             action = []
             File.open(file) do |contents|
               contents.each_line do |line|
-                next if line =~ /uses:/
-                splitted = line.split(' ')[-1]
-                if splitted.start_with?('docker')
-                  action << splitted.rpartition(':')[0]
+                next unless line =~ /\suses:/
+                if line.gsub(/\s+/, "").start_with?('#') then
+                  commented_out = commented_out + 1
+                  next
+                end
+                splitted = line.gsub(/\s+/, "")[/(?<=uses:).*/][/[^#]+/]
+                if splitted.start_with?('docker://')
+                  if splitted.count(':') > 1 then
+                    action << splitted.rpartition(':')[0]
+                  else
+                    action << splitted
+                  end
                 else
                   action << splitted.split('@')[0]
                 end
@@ -47,4 +57,5 @@ def find_actions(dir, output)
   end
 
   spinner.success
+  puts "Number of actions commented out: #{commented_out}"
 end

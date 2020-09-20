@@ -9,7 +9,8 @@ def rank_actions(input, output)
 
   nested_actions = []
   CSV.open(output, 'w') do |csv|
-    CSV.foreach(input) do |row|
+    csv << ["action", "appearences"]
+    CSV.foreach(input, headers: true) do |row|
       actions = row[3].tr('[\'"]', '').tr('\\', '').split(', ')
       nested_actions << actions
     end

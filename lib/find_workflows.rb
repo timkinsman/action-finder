@@ -11,7 +11,8 @@ def find_workflows(user, pass, input, output, dir)
   authenticate(user, pass)
 
   CSV.open(output, 'w') do |csv|
-    CSV.foreach(input) do |row|
+    csv << ["repository", "workflow_files", "workflow_files_count"]
+    CSV.foreach(input, headers: true) do |row|
       spinner = TTY::Spinner.new("[:spinner] Checking if #{row[0]} has workflows ...", format: :classic)
       spinner.auto_spin
 
