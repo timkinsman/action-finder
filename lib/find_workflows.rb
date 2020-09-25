@@ -6,6 +6,7 @@ require 'octokit'
 require 'tty-spinner'
 
 require_relative 'authenticate'
+require_relative 'check_rate_limit'
 
 def find_workflows(user, pass, input, output, dir)
   authenticate(user, pass)
@@ -17,17 +18,7 @@ def find_workflows(user, pass, input, output, dir)
       spinner.auto_spin
 
       begin
-        client = Octokit::Client.new(login: user, password: pass)
-        if client.rate_limit.remaining <= 0
-          spinner.error('ERROR: Rate limit exceeded!')
-          spinner = TTY::Spinner.new("[:spinner] Rate limit resets in #{client.rate_limit.resets_in + 5} seconds ...", format: :classic)
-          spinner.auto_spin
-
-          sleep(client.rate_limit.resets_in + 5)
-
-          spinner.success
-          redo
-        end
+        client = check_rate_limit(user, pass, 0, spinner)
         if client.repository?(row[0])
           workflows = client.contents(row[0], path: '.github/workflows')
           arr = []
