@@ -3,6 +3,7 @@
 source 'https://rubygems.org'
 
 gem 'csv'
+gem 'diffy'
 gem 'fileutils'
 gem 'mechanize'
 gem 'octokit', '~> 4.0'
