@@ -28,11 +28,12 @@ def find_actions(dir, output)
               contents.each_line do |line|
                 next unless line =~ /\suses:/
                 if line.gsub(/\s+/, "").start_with?('#') then
-                  commented_out = commented_out + 1
+                    #commented_out = commented_out + 1
                   next
                 end
                 splitted = line.gsub(/\s+/, "")[/(?<=uses:).*/][/[^#]+/]
-                if splitted.start_with?('docker://')
+                if splitted.include?('docker://')
+                  next
                   if splitted.count(':') > 1 then
                     action << splitted.rpartition(':')[0]
                   else

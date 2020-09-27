@@ -42,7 +42,7 @@ def get_metadata(repository, agent)
     metadata
 end
 
-def retrieve_metadata(input, output)
+def retrieve_actions_metadata(input, output)
     spinner = TTY::Spinner.new("[:spinner] Retrieving metadata on actions ...", format: :classic)
     spinner.auto_spin
 

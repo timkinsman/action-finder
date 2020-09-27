@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-file = "./data/actions_ranked.csv"
-
 require 'csv'
 require 'set'
 require 'json'
@@ -15,13 +13,15 @@ def rand_n(n, max)
 end
 
 def action_sample
-    rand_sample = rand_n(244, 667)
+    rand_sample = rand_n(237, 620)
 
-    CSV.open("./data/action_sample.csv", 'w') do |csv|
+    CSV.open("./data/action_sample_no_docker.csv", 'w') do |csv|
         csv << ["action"]
-        CSV.foreach(file, headers: true).with_index(1) do |row, rowno|   
+        CSV.foreach("./data/actions_ranked_no_docker.csv", headers: true).with_index(1) do |row, rowno|   
             next unless rand_sample.include? rowno
             csv << [row[0], row[1]]
         end
     end
 end
+
+action_sample
