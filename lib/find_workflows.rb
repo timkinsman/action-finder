@@ -5,11 +5,11 @@ require 'fileutils'
 require 'octokit'
 require 'tty-spinner'
 
-require_relative 'authenticate'
-require_relative 'check_rate_limit'
+require_relative 'util/authenticate'
+require_relative 'util/check_rate_limit'
 
 def find_workflows(user, pass, input, output, dir)
-  authenticate(user, pass)
+  client = authenticate(user, pass)
 
   CSV.open(output, 'w') do |csv|
     csv << ["repository", "workflow_files", "workflow_files_count"]
@@ -18,7 +18,7 @@ def find_workflows(user, pass, input, output, dir)
       spinner.auto_spin
 
       begin
-        client = check_rate_limit(user, pass, 0, spinner)
+        check_rate_limit(client, 0, spinner)
         if client.repository?(row[0])
           workflows = client.contents(row[0], path: '.github/workflows')
           arr = []

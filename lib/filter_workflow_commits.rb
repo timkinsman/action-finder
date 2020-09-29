@@ -7,8 +7,6 @@ temp = Tempfile.new
 hash = Hash.new{ |h,k| h[k] = Hash.new(&h.default_proc) }
 
 def get_diff(file1, file2, dup, hash)
-    ### to tmp_file
-
     with_block = false
     with_space = 0
 
@@ -110,43 +108,38 @@ def get_diff(file1, file2, dup, hash)
     end
 end
 
-spinner = TTY::Spinner.new("[:spinner] Retrieving metadata on commit history ...", format: :classic)
-spinner.auto_spin
+def filter_workflow_commits(output, dir)
+    spinner = TTY::Spinner.new("[:spinner] Retrieving metadata on commit history ...", format: :classic)
+    spinner.auto_spin
 
-Dir.foreach("data/workflows_commit_history") do |user|
-    next if user == '.' || user == '..'
+    Dir.foreach("#{dir}/workflow_commits") do |user|
+        next if user == '.' || user == '..'
 
-    Dir.foreach("data/workflows_commit_history/#{user}") do |repo|
-        next if repo == '.' || repo == '..'
+        Dir.foreach("#{dir}/workflow_commits/#{user}") do |repo|
+            next if repo == '.' || repo == '..'
 
-        Dir.foreach("data/workflows_commit_history/#{user}/#{repo}") do |workflow|
-            next if workflow == '.' or workflow == '..'
-            prev_file = temp.path
+            Dir.foreach("#{dir}/workflow_commits/#{user}/#{repo}") do |workflow|
+                next if workflow == '.' or workflow == '..'
+                prev_file = temp.path
 
-            Dir.foreach("data/workflows_commit_history/#{user}/#{repo}/#{workflow}") do |history|
-                next if history == '.' or history == '..'
+                Dir.foreach("#{dir}/workflow_commits/#{user}/#{repo}/#{workflow}") do |history|
+                    next if history == '.' or history == '..'
 
-                Dir.glob("data/workflows_commit_history/#{user}/#{repo}/#{workflow}/#{history}") do |file|
-                    get_diff(prev_file, file, true, hash)
-                    prev_file = file
+                    Dir.glob("#{dir}/workflow_commits/#{user}/#{repo}/#{workflow}/#{history}") do |file|
+                        get_diff(prev_file, file, true, hash)
+                        prev_file = file
+                    end
                 end
             end
         end
     end
-end
 
-spinner.success
+    spinner.success
 
-CSV.open('out.csv', 'w') do |csv|
-    csv << ['action', 'added', 'removed', 'modified_args', 'version_changes']
-    hash.each do |h|
-        csv << [h[0], h[1]['added'], h[1]['removed'], h[1]['modified_args'], h[1]['version_changes']]
-        #pp h[0]
-        #pp h[1]['added']
-        #pp h[1]['removed']
-        #pp h[1]['modified_args']
-        #pp h[1]['version_changes']
+    CSV.open(output, 'w') do |csv|
+        csv << ['action', 'added', 'removed', 'modified_args', 'version_changes']
+        hash.each do |h|
+            csv << [h[0], h[1]['added'], h[1]['removed'], h[1]['modified_args'], h[1]['version_changes']]
+        end
     end
 end
-
-#puts hash

@@ -10,16 +10,16 @@ require_relative 'authenticate'
 require_relative 'check_rate_limit'
 
 def retrieve_commit_history(user, pass, input, output)
-    authenticate(user, pass)
+    client = authenticate(user, pass)
 
     CSV.foreach(input, headers: true) do |row|
         row[1].gsub('[', '').gsub('"', '').gsub(']', '').split(', ') do |wf|
             spinner = TTY::Spinner.new("[:spinner] Retrieving #{row[0]}'s #{wf} commit history ...", format: :classic)
             spinner.auto_spin
 
-            client = check_rate_limit(user, pass, 0, spinner)
+            check_rate_limit(client, 0, spinner)
             commits = client.commits(row[0], path: ".github/workflows/#{wf}")
-            client = check_rate_limit(user, pass, commits.count, spinner)
+            check_rate_limit(client, commits.count, spinner)
 
             commits.reverse_each do |commit|
                 dest = "#{output}/#{row[0]}/#{wf.rpartition('.')[0]}"
