@@ -1,0 +1,62 @@
+on: pull_request
+jobs:
+  check-pr:
+    name: validate commits
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+    - run: git fetch origin master
+    - uses: flux-framework/pr-validator@master
+
+  check-sched:
+    name: flux-sched check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+    - run: git fetch --tags
+    - run: >
+        src/test/docker/docker-run-checks.sh --install-only
+        --tag=fluxrm/flux-core:bionic
+    - run: >
+        cd .. &&
+        git clone https://github.com/flux-framework/flux-sched &&
+        cd flux-sched &&
+        src/test/docker/docker-run-checks.sh -j 4 -i bionic
+
+  check-asan:
+    name: address-sanitizer check
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+    - run: git fetch --tags
+    - name: docker-run-checks with ASan
+      env:
+        CC: gcc-8
+        CXX: g++-8
+        PRELOAD: /usr/lib/gcc/x86_64-linux-gnu/8/libasan.so
+        ASAN_OPTIONS: detect_leaks=0,start_deactivated=true
+        FLUX_TEST_SIZE_MAX: 4
+        TAP_DRIVER_QUIET: t
+        FLUX_TEST_TIMEOUT: 300
+      run: >
+        src/test/docker/docker-run-checks.sh --image=bionic -j2 --
+        --with-flux-security --enable-sanitizer=address
+    - name: after failure
+      if: failure()
+      run: >
+        find . -name test-suite.log |
+        xargs -i sh -c 'printf "===XXX {} XXX===";cat {}';
+        find . -name 't[0-9]*.output' |
+        xargs -i sh -c 'printf "\033[31mFound {}\033[39m\n";cat {}';
+        find . -name '*.asan.*' |
+        xargs -i sh -c 'printf "\033[31mFound {}\033[39m\n";cat {}' 

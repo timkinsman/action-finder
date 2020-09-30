@@ -1,0 +1,27 @@
+name: Ubuntu/latest CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: set up environment
+      run: |
+        sudo apt-get install gcc gir1.2-glib-2.0 gobject-introspection libglib2.0-dev ninja-build python3-setuptools python3-wheel
+        sudo pip3 install meson==0.50.1
+    - name: configure the build
+      run: meson _build .
+    - name: build
+      run: ninja -C _build
+    - name: check
+      run: meson test -C _build
+    - name: dist
+      run: meson dist -C _build

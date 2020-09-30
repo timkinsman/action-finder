@@ -1,0 +1,55 @@
+name: GitHub Actions CI
+on:
+  push:
+    branches: master
+  pull_request: []
+jobs:
+  tests:
+    runs-on: macOS-latest
+    steps:
+    - name: Set up Git repository
+      uses: actions/checkout@master
+
+    - name: Set up Homebrew
+      run: |
+        export HOMEBREW_DEVELOPER="1"
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        brew update-reset
+        rm -f /usr/local/lib/libcrypto.1.1.dylib /usr/local/lib/libssl.1.1.dylib
+        brew install mysql
+        rm -rf /usr/local/Homebrew/Library/Taps/homebrew/homebrew-services
+        ln -s "$PWD" /usr/local/Homebrew/Library/Taps/homebrew/homebrew-services
+
+    - name: Run brew style
+      run:
+        cd /usr/local/Homebrew
+        brew style homebrew/services
+
+    - name: Install Homebrew/homebrew-services RubyGems
+      run: |
+        gem install bundler -v "~>1"
+        bundle install --jobs 4 --retry 3
+
+    - name: Run Homebrew/homebrew-services RSpec tests
+      run: bundle exec rspec
+
+    - name: Test start command
+      run: |
+        # Test start command
+        brew services start mysql
+        brew services list | grep mysql
+        sleep 5
+        mysql -uroot -e 'show databases'
+
+    - name: Test stop command
+      run: |
+        brew services stop mysql
+        sleep 5
+        if launchctl list | grep mysql; then false; else true; fi
+
+    - name: Test run command
+      run: |
+        brew services run mysql
+        sleep 5
+        mysql -uroot -e 'show databases'
+        brew services stop mysql

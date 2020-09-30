@@ -1,0 +1,43 @@
+name: CI default
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Setup Java 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: '11'
+      - name: Gradle Build
+        run: ./gradlew build
+#      - name: Sonar Analysis
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        run: ./gradlew sonarqube
+#          -Dsonar.projectKey=manusa_mnIMAPSync
+#          -Dsonar.organization=manusa-github
+#          -Dsonar.host.url=https://sonarcloud.io
+#          -Dsonar.login=${{ secrets.SONARCLOUD_TOKEN }}
+      - name: Compute Tag Name
+        id: tagName
+        uses: actions/github-script@v0.2.0
+        with:
+          github-token: ${{github.token}}
+          script: |
+            console.log(context);
+            console.log(github);
+            console.log(github.ref);
+            return 'DELETE_JUST_A_TEST';
+
+      - name: Dockerize
+        uses: manusa/actions-publish-docker@master
+        with:
+          name: marcnuri/mnimapsync
+          tag: ${{ steps.tagName.outputs.result }}
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}

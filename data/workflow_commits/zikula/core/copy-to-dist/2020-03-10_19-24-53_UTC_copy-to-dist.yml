@@ -1,0 +1,107 @@
+name: Copy Files to Distribution
+on:
+  push:
+    branches: [master]
+jobs:
+  copy_kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy Kernel.php
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /src/Kernel.php
+          dst_path: /src/Kernel.php
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy index.php
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /public/index.php
+          dst_path: /public/index.php
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_htaccess:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy .htaccess
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /public/.htaccess
+          dst_path: /public/.htaccess
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy .env
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /.env
+          dst_path: /.env
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy config
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /config/
+          file_filter: 'bootstrap.php|bundles.php|routes.yaml|services.yaml'
+          dst_path: /config/
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_dynamic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy config/dynamic/default.yaml
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /config/dynamic/default.yaml
+          dst_path: /config/dynamic/default.yaml
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy config/packages/
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /config/packages/
+          exclude: '*+(/test/|/dev/)*'
+          dst_path: /config/packages/
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_routes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy config/routes
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /config/routes/
+          exclude: '*+(/dev/)*'
+          dst_path: /config/
+          dst_owner: zikula
+          dst_repo_name: distribution
+  copy_workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy config/workflows
+        uses: andstor/copycat-action@v3
+        with:
+          personal_token: ${{ secrets.COPY_DIST_TOKEN }}
+          src_path: /config/workflows/
+          dst_path: /config/
+          dst_owner: zikula
+          dst_repo_name: distribution

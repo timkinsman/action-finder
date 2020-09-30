@@ -1,0 +1,21 @@
+name: XML validation
+
+on: [push, pull_request]
+  paths:
+  - 'hash/*'
+
+jobs:
+
+  validate-hsi:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Validate
+      run: for x in hash/*.hsi ; do xmllint --noout "$x" ; done
+
+  validate-xml:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Validate
+      run: for x in hash/*.xml ; do xmllint --noout --valid "$x" ; done

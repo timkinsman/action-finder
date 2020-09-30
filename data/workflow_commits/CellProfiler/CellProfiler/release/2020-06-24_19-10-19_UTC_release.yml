@@ -1,0 +1,53 @@
+name: release
+on:
+  push:
+    branches: [ master ]
+#  release:
+#    types: [created]
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-10.15, ubuntu-20.04, windows-2019]
+        python-version: [ '3.8' ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          architecture: x64
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '14.0.1' # The JDK version to make available on the path.
+          java-package: jdk
+          architecture: x64
+      - run: python --version
+      - run: pip install --upgrade pip setuptools wheel
+      - run: git clone https://github.com/CellProfiler/pyinstaller.git
+      - run: pip install --editable .
+        working-directory: pyinstaller
+      - run: git clone https://github.com/CellProfiler/distribution.git
+      - run: pip install numpy
+      - if: ${{ matrix.os == 'macos-10.15' }}
+        run: brew install mysql
+      - env:
+          LDFLAGS: -L/usr/local/opt/mysql-client/lib
+        if: ${{ matrix.os == 'macos-10.15' }}
+        run: make
+        working-directory: ./distribution/macos
+      - if: ${{ matrix.os == 'ubuntu-20.04' }}
+        run: echo
+      - if: ${{ matrix.os == 'windows-2019' }}
+        run: |
+          echo "::set-env name=JAVA_HOME::C:\hostedtoolcache\windows\jdk\14.0.1\x64"
+          echo %JAVA_HOME%
+          #java -XshowSettings:properties -version
+          #echo "Installing dependencies"
+          pip install mysqlclient
+          pip install -e .
+      - if: ${{ matrix.os == 'windows-2019' }}
+        run: |
+          echo "Freezing CellProfiler"
+          pyinstaller cellprofiler.spec
+        working-directory: ./distribution/windows

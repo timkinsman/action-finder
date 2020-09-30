@@ -1,0 +1,69 @@
+name: Build
+on: [push]
+jobs:
+  test:
+    name: Ruby ${{ matrix.ruby }} / ${{ matrix.gemfile }}
+    runs-on: ubuntu-18.04
+
+    strategy:
+      matrix:
+        ruby:
+          - '2.7'
+          - '2.6'
+          - '2.5'
+        gemfile:
+          - Gemfile.rails-6-0
+          - Gemfile.rails-5-2
+          - Gemfile.rails-5-1
+          - Gemfile.rails-5-0
+          - Gemfile.rails-4-2
+          - Gemfile.rails-master
+        exclude:
+          - {ruby: '2.7', gemfile: 'Gemfile.rails-4-2'}
+          - {ruby: '2.6', gemfile: 'Gemfile.rails-4-2'}
+      fail-fast: false
+
+    services:
+      rabbitmq:
+        image: rabbitmq:latest
+        ports: [5672/tcp]
+        options: --health-cmd "rabbitmqctl node_health_check" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - uses: actions/cache@v1
+        with:
+          path: vendor
+          key: v1-ruby-${{ matrix.ruby }}-gemfile-${{ matrix.gemfile }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install --quiet --yes libsqlite3-dev
+
+      - name: Install bundler
+        env:
+          BUNDLE_GEMFILE: gemfiles/${{ matrix.gemfile }}
+        run: |
+          gem install bundler -v '~> 2.0'
+          bundle config path "$(pwd)/vendor/bundle"
+          bundle config without development
+
+      - name: Run bundle install
+        env:
+          BUNDLE_GEMFILE: gemfiles/${{ matrix.gemfile }}
+        run: bundle install --gemfile gemfiles/${{ matrix.gemfile }} --jobs=4 --retry=3
+
+      - name: Run unit tests
+        env:
+          AMQP_SERVER: amqp://localhost:${{ job.services.rabbitmq.ports[5672] }}
+          BUNDLE_GEMFILE: gemfiles/${{ matrix.gemfile }}
+        run: bundle exec rspec -Ispec/support -Ispec/msgr -rsetup --color spec/msgr
+
+      - name: Run integration tests
+        env:
+          AMQP_SERVER: amqp://localhost:${{ job.services.rabbitmq.ports[5672] }}
+          BUNDLE_GEMFILE: gemfiles/${{ matrix.gemfile }}
+        run: bundle exec rspec -Ispec/support -Ispec/integration -rsetup --color spec/integration

@@ -1,0 +1,136 @@
+name: Lint + Test
+
+on: 
+  - push
+  - pull_request
+
+jobs:
+  test_linux:
+
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 3
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: setup apt dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install xvfb qt5-default opencl-headers ocl-icd-opencl-dev
+        python -m pip install --upgrade pip
+    - name: Lint with flake8
+      run: |
+        python -m pip install flake8 black
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 --ignore=F401,W504,W503 --count --show-source --statistics --exclude=refnx/_lib/emcee,refnx/reflect/_app/resources_rc.py,refnx/analysis refnx
+        black --check refnx/analysis -l 79
+    - name: Install dependencies
+      run: |
+        python -m pip install wheel
+        python -m pip install numpy scipy h5py cython pandas xlrd flake8 pytest ipywidgets IPython matplotlib traitlets pyqt5
+        python -m pip install uncertainties ptemcee corner tqdm pytest-qt periodictable pyopencl
+        pip install git+https://github.com/pymc-devs/pymc3
+    - name: Test with pytest
+      env:
+        MPLBACKEND: agg
+      run: |
+        python -m pip install -e .
+        python -m pip install pytest
+        # uses xvfb for GUI part of the test
+        xvfb-run pytest
+
+
+  linux_wheels:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Make Linux Wheels
+      run: |
+        docker run --rm -v $(pwd):/io quay.io/pypa/manylinux2010_x86_64 /bin/bash /io/tools/build_manylinux_wheels.sh
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: refnx-wheel
+        path: dist/
+
+
+  test_macos:
+
+    runs-on: macos-latest
+    strategy:
+      max-parallel: 3
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+
+    env:
+      CC: /usr/bin/clang
+      CXX: /usr/bin/clang++
+      CXXFLAGS: "-Xpreprocessor -fopenmp -I/usr/local/opt/libomp/include"
+      CFLAGS: "-Xpreprocessor -fopenmp -I/usr/local/opt/libomp/include"
+      LDFLAGS: "-L/usr/local/opt/libomp/lib -lomp"
+      DYLD_LIBRARY_PATH: /usr/local/opt/libomp/lib
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - run: mkdir -p dist
+
+    - name: Install openmp
+      run: |
+        brew update
+        brew install libomp
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install wheel
+        pip install numpy scipy h5py cython pandas xlrd pytest ipywidgets IPython matplotlib traitlets pyqt5
+        pip install uncertainties ptemcee corner tqdm pytest-qt periodictable delocate pyopencl
+        pip install git+https://github.com/pymc-devs/pymc3
+
+    - name: Make wheel
+      env:
+        MACOSX_DEPLOYMENT_TARGET: 10.9
+      run: |
+        python setup.py bdist_wheel
+        # so that libomp is distributed with wheel
+        delocate-wheel -v dist/*.whl
+
+    - name: Install package and test with pytest
+      env:
+        MPLBACKEND: agg
+      run: |
+        pushd dist
+        pip install --only-binary=refnx --no-index --find-links=. refnx
+        pytest --pyargs refnx
+        popd
+
+    - name: Make frozen GUI executable
+      if: ${{ matrix.python-version == '3.8' }}
+      run: |
+        pip uninstall -y pytest pytest-qt h5py pandas xlrd uncertainties
+        pip install setuptools==44
+
+        # fix for multiprocessing on Py3.8 is not merged in PyInstaller
+        # if you are on Py3.7 you can just pip install pyinstaller
+        pip install git+https://github.com/andyfaff/pyinstaller.git@gh4865
+
+        pyinstaller tools/app/motofit.spec
+        rm dist/motofit
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: refnx-wheel
+        path: dist/

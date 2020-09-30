@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  #schedule:
+  #  - cron: '0 2 * * *' # run at 2 AM UTC
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        image: 
+          - ubuntu:bionic
+          - ubuntu:focal
+          - debian:buster
+        cc:
+          - clang
+          - gcc
+        include:
+          # at least some versions of clang cannot compile php bindings
+          - cc: clang
+            cxx: clang++
+            php: disable
+          - cc: gcc
+            cxx: g++
+            php: enable
+
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install ubuntu dependencies
+      if: startsWith(matrix.image, 'ubuntu') || startsWith(matrix.image, 'debian')
+      run: |
+        set -ex
+        apt-get --yes --force-yes update
+        apt-get --yes --force-yes install python3-pip python3-all-dev python3-numpy fpc gfortran gcc php-dev swig libperl-dev perl lua5.3 liblua5.3-dev ruby-dev default-jdk clang
+        pip3 install Cython
+        set +ex
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    - name: Build and test
+      run: |
+        set -ex
+        autoreconf -fi
+        # disable java for now
+        ./configure --disable-python --disable-python-numpy --enable-perl --enable-lua --enable-pascal --disable-java --${PHP_ENABLE}-php --enable-ruby
+        make
+        make check
+        make distclean
+        ./configure --disable-all-bindings CFLAGS="-std=c89 -pedantic $CFLAGS"
+        make
+        make check
+        make distclean
+        ./configure --disable-ruby --disable-perl --disable-lua --enable-python-numpy --enable-python PYTHON=${XRL_PYTHON3}
+        make
+        make check
+        make distclean
+        ./configure --disable-all-bindings --disable-shared --enable-static
+        make
+        make check
+        make distclean
+        ./configure --disable-all-bindings
+        make distcheck PYTHON=${XRL_PYTHON3}
+        set +ex
+      env:
+        CC: ${{matrix.cc}}
+        CXX: ${{matrix.cxx}}
+        XRL_PYTHON3: /usr/bin/python3
+        LUA: /usr/bin/lua5.3
+        JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF8
+        PHP_ENABLE: ${{matrix.php}}
+        DISTCHECK_CONFIGURE_FLAGS: --enable-pascal --enable-java --enable-perl --enable-lua --enable-python --enable-python-numpy --${{matrix.php}}-php --enable-ruby

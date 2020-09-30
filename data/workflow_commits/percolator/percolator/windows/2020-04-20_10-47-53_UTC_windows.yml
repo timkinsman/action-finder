@@ -1,0 +1,43 @@
+name: native windows
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+defaults:
+  run:
+    shell: cmd
+#    working-directory: scripts
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: create_dirs
+      run: |
+        mkdir ..\my_rel ..\my_build
+        dir ..
+
+    - name: configure_and_make
+#      working-directory: ${{working-directory}}\percolator
+      run: |
+        cd ..
+        SET base_dir=%cd%
+        ECHO %base_dir%
+        dir C:\Program Files\
+        dir C:\Program Files\Microsoft Visual Studio\
+        dir C:\Program Files\Microsoft Visual Studio\2019\Enterprise
+        dir C:\Program Files\Microsoft Visual Studio 16.0\VC
+        percolator\admin\builders\nativew64_build.bat -s %base_dir% -r %base_dir%\my_rel -b %base_dir%\my_build
+#        dir C:\Program Files\Microsoft Visual Studio %MSVC_VER%.0\VC
+    - name: install_and_test
+      run: |
+        cd %base_dir%\my_build\percolator
+        dir
+        make install
+        make test ARGS="-V"

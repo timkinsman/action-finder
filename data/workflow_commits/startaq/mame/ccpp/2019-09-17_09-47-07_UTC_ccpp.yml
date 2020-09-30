@@ -1,0 +1,136 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+
+#  build-linux:
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        compiler: [gcc, clang]
+#        include:
+#          - compiler: gcc
+#            cc: gcc-9
+#            cxx: g++-9
+#            archopts: -U_FORTIFY_SOURCE
+#          - compiler: clang
+#            cc: clang
+#            cxx: clang++
+#    steps:
+#    - uses: actions/checkout@master
+#    - name: Install dependencies
+#      run: |
+#        sudo apt-get update
+#        sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev libasound2-dev libxinerama-dev libxi-dev qt5-default
+#    - name: Install GCC
+#      if: matrix.compiler == 'gcc'
+#      run: sudo apt-get install -y gcc-9 g++-9
+#    - name: Install Clang
+#      if: matrix.compiler == 'clang'
+#      run: sudo apt-get install -y clang
+#    - name: Build
+#      env:
+#        TOOLS: 1
+#        OVERRIDE_CC: ${{ matrix.cc }}
+#        OVERRIDE_CXX: ${{ matrix.cxx }}
+#        ARCHOPTS: ${{ matrix.archopts }}
+#      run: make -j2
+#    - name: Validate
+#      run: ./mame64 -validate
+
+  build-windows-msvc:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install build tools
+      run: |
+        curl -L https://github.com/mamedev/buildtools/releases/download/4.0/msys64-32-2019-03-25.exe -o msys64-32-2019-03-25.exe
+        7z x -oC:\ msys64-32-2019-03-25.exe
+        del msys64-32-2019-03-25.exe
+    - name: Update build tools (core)
+      run: |
+        cd /D C:\msys64
+        call win32\env.bat
+        pacman -Syu --noconfirm
+    - name: Update build tools (packages)
+      run: |
+        cd /D C:\msys64
+        call win32\env.bat
+        pacman -Syu --noconfirm
+    - name: Build
+      env:
+        MSBUILD: 1
+        TOOLS: 1
+      run: |
+        cd /D C:\msys64
+        call win32\env.bat
+        cd /D %GITHUB_WORKSPACE%
+        set PATH=%PATH%;"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\MSBuild\Current\Bin\"
+        make -j2 vs2017
+    - name: Validate
+      run: mame64 -validate
+
+#  build-windows-gcc:
+#    runs-on: windows-latest
+#    strategy:
+#      matrix:
+#        osd: [windows, sdl]
+#        include:
+#          - osd: sdl
+#            prefix: sdl
+#    steps:
+#    - uses: actions/checkout@master
+#    - name: Install build tools
+#      run: |
+#        curl -L https://github.com/mamedev/buildtools/releases/download/4.0/msys64-32-2019-03-25.exe -o msys64-32-2019-03-25.exe
+#        7z x -oC:\ msys64-32-2019-03-25.exe
+#        del msys64-32-2019-03-25.exe
+#    - name: Update build tools (core)
+#      run: |
+#        cd /D C:\msys64
+#        call win32\env.bat
+#        pacman -Syu --noconfirm
+#    - name: Update build tools (packages)
+#      run: |
+#        cd /D C:\msys64
+#        call win32\env.bat
+#        pacman -Syu --noconfirm
+#    - name: Build
+#      env:
+#        QT_DEBUG: 1
+#        TOOLS: 1
+#        OSD: ${{ matrix.osd }}
+#      run: |
+#        cd /D C:\msys64
+#        call win32\env.bat
+#        cd /D %GITHUB_WORKSPACE%
+#        make -j2
+#    - name: Validate
+#      run: |
+#        cd /D C:\msys64
+#        call win32\env.bat
+#        cd /D %GITHUB_WORKSPACE%
+#        ${{ matrix.prefix }}mame64 -validate
+#    - uses: actions/upload-artifact@master
+#      with:
+#        name: ${{ matrix.prefix }}mame64
+#        path: ${{ matrix.prefix }}mame64.exe
+
+#  build-macos-clang:
+#    runs-on: macOS-latest
+#    steps:
+#    - uses: actions/checkout@master
+#    - name: Install dependencies
+#      run: |
+#        brew update
+#        brew install sdl2 sdl2_ttf
+#    - name: Build
+#      env:
+#        USE_LIBSDL: 1
+#        TOOLS: 1
+#      run: |
+#         unset LDOPTS
+#         make -j2
+#    - name: Validate
+#      run: ./mame64 -validate

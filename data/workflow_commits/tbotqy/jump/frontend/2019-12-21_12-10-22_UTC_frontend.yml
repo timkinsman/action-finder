@@ -1,0 +1,64 @@
+name: Frontend
+on:
+  push:
+    paths:
+    - 'frontend/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/master'
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+    - uses: actions/cache@v1
+      with:
+        path: ${{ github.workspace }}/frontend/node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-node-modules-
+    - name: Lint
+      working-directory: frontend
+      run: |
+        yarn install
+        yarn lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+    - uses: actions/cache@v1
+      with:
+        path: ${{ github.workspace }}/frontend/node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-node-modules-
+    - name: Test
+      working-directory: frontend
+      run: |
+        yarn install
+        yarn test:ci
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+    - uses: actions/cache@v1
+      with:
+        path: ${{ github.workspace }}/frontend/node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-node-modules-
+    - name: Build
+      working-directory: frontend
+      run: |
+        yarn install --production
+        yarn build

@@ -1,0 +1,26 @@
+name: hlsdl build
+
+on: [push, pull_request]
+
+jobs:
+  build-macos:
+
+    runs-on: macOS-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: make
+      run: make
+
+  build-ubuntu:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: update apt
+      run: sudo apt update
+    - name: install libcurl libcrypto
+      run: sudo apt -y install libcurl4-openssl-dev libssl-dev
+    - name: make
+      run: make

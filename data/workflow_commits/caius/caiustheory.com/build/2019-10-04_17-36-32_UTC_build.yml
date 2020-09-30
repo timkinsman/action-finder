@@ -1,0 +1,22 @@
+---
+name: Build caiustheory
+
+"on":
+  push:
+    branches-ignore:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2.2.1
+        with:
+          hugo-version: '0.55.6'
+
+      - name: Build
+        run: hugo --gc --minify --cleanDestinationDir

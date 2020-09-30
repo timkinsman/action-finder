@@ -1,0 +1,21 @@
+# Run unit tests through CTest
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: cmake
+      run: cmake --build build --config Release
+    - name: Build and run tests
+      run: |
+        cd build
+        make test

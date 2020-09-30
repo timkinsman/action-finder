@@ -1,0 +1,20 @@
+# Run clang-format
+name: Clang-format
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  install-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run clang-format
+      uses: HorstBaerbel/action-clang-format@master
+      with:
+        sourcedir: '.'
+        excludedir: './build'

@@ -1,0 +1,24 @@
+---
+name: Build caiustheory
+
+"on":
+  push:
+    branches-ignore:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # Fetch all history for .GitInfo and .Lastmod
+
+      - name: Setup Hugo
+        uses: docker://peaceiris/gh-pages:v2.4.0
+        with:
+          hugo-version: '0.55.6'
+
+      - name: Build
+        run: hugo --gc --minify --cleanDestinationDir

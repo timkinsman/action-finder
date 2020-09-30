@@ -6,8 +6,8 @@ require 'fileutils'
 require 'octokit'
 require 'tty-spinner'
 
-require_relative 'authenticate'
-require_relative 'check_rate_limit'
+require_relative 'util/authenticate'
+require_relative 'util/check_rate_limit'
 
 def retrieve_commit_history(user, pass, input, output)
     client = authenticate(user, pass)

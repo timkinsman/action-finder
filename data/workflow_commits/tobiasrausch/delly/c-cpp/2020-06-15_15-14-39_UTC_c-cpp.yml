@@ -1,0 +1,20 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: make
+      run: |
+        ls -lhRS /usr/local/share/boost/1.72.0/
+        sudo apt-get update
+        sudo apt-get install -y libcurl4-gnutls-dev libhts-dev libhts2
+        LDFLAGS="-L/usr/local/share/boost/1.72.0/lib" CXXFLAGS="-I/usr/local/share/boost/1.72.0/include" make

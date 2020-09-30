@@ -1,0 +1,32 @@
+# Build and deploy a new docker image for Nuxeo Drive GNU/Linux binary builds
+name: Alpha clean-up
+
+on:
+  # Check for updates every day
+  schedule:
+    - cron:  '0 0 * * *'
+
+  # Allow to clean-up a specific version
+  workflow_dispatch:
+    inputs:
+      appVersion:
+        description: 'The version to purge.'
+        required: true
+        default: ''
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
+    - name: Clean-up old versions
+      run: |
+        echo ${{ secrets.SSH_PRIV_KEY }} | base64 --decode > private.key
+        chmod 0600 private.key
+        eval "$(ssh-agent -s)"
+        ssh-add private.key
+        bash tools/cleanup.sh ${{ github.event.inputs.appVersion }}

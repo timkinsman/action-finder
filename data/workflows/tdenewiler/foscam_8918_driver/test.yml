@@ -1,0 +1,56 @@
+---
+name: Build & Test
+
+on: [pull_request, push]  # NOLINT
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        container:
+          - image: 'ros:kinetic'
+            env:
+              ROS_DISTRO: kinetic
+          - image: 'ros:melodic'
+            env:
+              ROS_DISTRO: melodic
+
+    container: ${{ matrix.container }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: src/foscam_8918_driver
+
+      # Remove apt repos that are known to break from time to time.
+      # See https://github.com/actions/virtual-environments/issues/323
+      - name: Remove broken apt repos [Ubuntu]
+        run: |
+          for apt_file in `grep -lr microsoft /etc/apt/sources.list.d/`; do sudo rm $apt_file; done
+
+      - name: Install pip
+        run: |
+          sudo apt update
+          sudo apt install -y python-pip
+          sudo apt install -y python-catkin-tools
+          python -m pip install --upgrade pip
+
+      - name: Create workspace
+        run: |
+          cd src
+          wstool init
+          cd ..
+          rosdep update
+          rosdep install -y --from-paths src --ignore-src --rosdistro $ROS_DISTRO
+
+      - name: Build
+        run: |
+          . /opt/ros/$ROS_DISTRO/setup.bash
+          catkin build

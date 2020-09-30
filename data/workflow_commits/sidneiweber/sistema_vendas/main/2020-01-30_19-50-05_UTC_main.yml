@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+    - master
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        run: echo "Run Build"
+
+  verify:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/teste'
+    steps:
+      - name: 'Verify'
+        run: echo "Run verify"
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event.comment.body == 'OK to deploy'
+    steps:
+      - name: 'Deploy'
+        run: echo "Run deploy"

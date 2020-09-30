@@ -1,0 +1,31 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java:
+          - 1.8 # Legacy LTS version
+          - 11  # Latest LTS version
+          - 14  # Latest non LST version
+          - 15  # Next non LST version (under develop)
+          - 16  # Latest develop version
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      - name: Show a Java version for ${{ matrix.java }}
+        run: java -version
+      - name: Build with Maven using ${{ matrix.java }}
+        run: mvn -B verify

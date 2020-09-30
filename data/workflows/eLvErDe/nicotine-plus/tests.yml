@@ -1,0 +1,82 @@
+name: In-Tree Unit Tests
+
+on: [push, pull_request]
+
+jobs:
+
+  ubuntu:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-16.04, ubuntu-18.04, ubuntu-20.04]
+        python: [3.5, 3.6, 3.7, 3.8]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: |
+          BUILD_DEPS=$(perl -ne 'next if /^#/; $p=(s/^Build-Depends:\s*/ / or (/^ / and $p)); s/,|\n|\([^)]+\)//mg; print if $p' < debian/control)
+
+          sudo apt update
+          sudo apt -y install $BUILD_DEPS
+
+      - name: Lint with flake8
+        run: |
+          flake8
+
+      - name: Unit tests
+        env:
+          PYTHONPATH: .
+        run: |
+          py.test-3
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+
+      - name: Install dependencies
+        run: |
+          export ARCH=x86_64
+          files/windows/dependencies.sh
+
+      - name: Unit tests
+        run: |
+          pytest
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          files/macos/dependencies.sh
+
+      - name: Unit tests
+        run: |
+          # Disable version test due to macOS machines hitting GitHub's rate limits
+          pytest -v -k 'not version'

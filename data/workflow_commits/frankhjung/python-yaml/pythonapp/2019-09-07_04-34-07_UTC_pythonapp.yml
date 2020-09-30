@@ -1,0 +1,61 @@
+name: Python application
+
+on:
+  push:
+    branches:
+    - master
+    - 'feature/*'
+  schedule:
+    - cron: '0 0 * * *'  # daily
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v1
+
+    - name: set up python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+
+    - name: install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: lint source
+      run: |
+        yapf --version
+        pylint --version
+        yapf --style google --diff --parallel main.py setup.py employees/employees.py tests/testemployees.py
+        pylint main employees.employees tests.testemployees
+        python setup.py check
+
+    - name: test
+      run: |
+        pytest -v --html=cover/report.html --cov=employees --cov-report=html:cover tests/test*.py
+
+    - name: run example application
+      run: |
+        python -m main -h
+        python -m main --version
+        python -m main -v tests/test.yaml
+
+    - name: make documentation
+      run: |
+        (cd docs; make html)
+
+    - name: publish to pages
+      uses: crazy-max/ghaction-github-pages@master
+      if: success()
+      with:
+        build_dir: target/docs/html
+        target_branch: gh-pages
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+

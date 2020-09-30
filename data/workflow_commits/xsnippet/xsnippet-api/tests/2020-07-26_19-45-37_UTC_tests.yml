@@ -1,0 +1,127 @@
+name: Tests
+
+on:
+  - pull_request
+  - push
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+
+jobs:
+  cargo-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: rustfmt
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  cargo-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: clippy
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+  cargo-test:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+        rust-version:
+          - nightly
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust-version }}
+          override: true
+
+      - name: Start PostgreSQL and create a database  (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo service postgresql start
+          sudo -u postgres createuser -s devel
+          sudo -u postgres createdb -O devel devel
+          sudo -u postgres psql -c "ALTER USER devel PASSWORD 'devel';" devel
+          echo '::set-env name=ROCKET_DATABASE_URL::postgres://devel:devel@localhost/devel'
+
+      - name: Start PostgreSQL and create a database (MacOS)
+        if: runner.os == 'macOS'
+        run: |
+          /usr/local/opt/postgres/bin/pg_ctl -D /usr/local/var/postgres start
+          /usr/local/opt/postgres/bin/createuser -s devel
+          /usr/local/opt/postgres/bin/createdb -O devel devel
+          /usr/local/opt/postgres/bin/psql -c "ALTER USER devel PASSWORD 'devel';" devel
+          echo '::set-env name=ROCKET_DATABASE_URL::postgres://devel:devel@localhost/devel'
+
+      - name: Start PostgreSQL and create a database (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo '::add-path::C:\Program Files\PostgreSQL\12\bin'
+          echo '::add-path::C:\Program Files\PostgreSQL\12\lib'
+          echo '::set-env name=PQ_LIB_DIR::C:\Program Files\PostgreSQL\12\lib'
+          sc config postgresql-x64-12 start= demand
+          net start postgresql-x64-12
+          "C:\Program Files\PostgreSQL\12\bin\createuser" -s devel
+          "C:\Program Files\PostgreSQL\12\bin\createdb" -O devel devel
+          "C:\Program Files\PostgreSQL\12\bin\psql" -c "ALTER USER devel PASSWORD 'devel';" devel
+          echo '::set-env name=ROCKET_DATABASE_URL::postgres://devel:devel@localhost/devel'
+
+      - name: Install Alembic and psycopg2
+        run: |
+          python -m pip install --upgrade wheel
+          python -m pip install --upgrade alembic psycopg2
+
+      - name: Run database migrations
+        run: |
+          python -m alembic.config upgrade head
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+  cargo-rustdoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: rustdoc
+          args: -- -D intra-doc-link-resolution-failure

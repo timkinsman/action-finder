@@ -1,0 +1,29 @@
+# Ubuntu build that leverages GitHub's native Actions environment
+# This build uses openssl + glibc 
+
+name: Ubuntu build (openssl+glibc)
+
+on: [push]
+
+jobs:
+  build:
+
+    # Ubuntu latest is really latest LTS
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: dependencies
+      run: sudo apt install libasr-dev libevent-dev libssl-dev bison
+    - name: boostrap
+      run: bash bootstrap
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    - name: make install
+      run: sudo make install
+#    - name: make check
+#      run: make check
+#    - name: make distcheck
+#      run: make distcheck

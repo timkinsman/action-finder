@@ -1,0 +1,40 @@
+name: ubuntu-bundler3
+
+on:
+  pull_request:
+
+  push:
+    branches:
+      - staging
+      - trying
+
+jobs:
+  ubuntu-bundler3:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby: [ 2.4.9, 2.5.7, 2.6.5 ]
+        rgv: [ v3.0.6, master ]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - name: Prepare dependencies
+        run: |
+          gem i parallel_tests -v "~> 2.29"
+          bin/rake override_version
+          bin/rake spec:parallel_deps
+      - name: Run Test
+        run: bin/parallel_rspec spec
+        env:
+          RGV: ${{ matrix.rgv }}
+          BUNDLER_SPEC_SUB_VERSION: 3.0.0
+      - name: Run Test with realworld
+        run: |
+          bin/rake spec:realworld
+        env:
+          RGV: ${{ matrix.rgv }}
+          BUNDLER_SPEC_PRE_RECORDED: 1
+    timeout-minutes: 60

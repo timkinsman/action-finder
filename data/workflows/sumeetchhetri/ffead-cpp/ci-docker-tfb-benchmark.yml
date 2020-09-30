@@ -1,0 +1,21 @@
+name: Build and benchmark ffead-cpp base docker image
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip_build]')"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build and benchmark the ffead-cpp-5.0 base docker image
+      run: |
+        git clone https://github.com/TechEmpower/FrameworkBenchmarks
+        cp -f docker/DockerFile-tfb-test FrameworkBenchmarks/frameworks/C++/ffead-cpp/ffead-cpp.dockerfile
+        cp -f docker/techempower-config/* FrameworkBenchmarks/frameworks/C++/ffead-cpp/
+        cd FrameworkBenchmarks
+        ./tfb --mode benchmark --test ffead-cpp ffead-cpp-mongo-raw ffead-cpp-postgresql ffead-cpp-postgresql-raw

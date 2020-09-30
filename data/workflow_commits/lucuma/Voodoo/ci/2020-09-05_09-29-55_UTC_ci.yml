@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      pytest_addopts:
+        description:
+          Extra options for pytest; use -vv for full details; see
+          https://docs.pytest.org/en/latest/example/simple.html#how-to-change-command-line-options-defaults
+        required: false
+
+env:
+  LANG: "en_US.utf-8"
+  LC_ALL: "en_US.utf-8"
+  PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
+  POETRY_CACHE_DIR: ${{ github.workspace }}/.cache/pypoetry
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  PRE_COMMIT_HOME: ${{ github.workspace }}/.cache/pre-commit
+  PYTEST_ADDOPTS: ${{ github.event.inputs.pytest_addopts }}
+  PYTHONIOENCODING: "UTF-8"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+        python-version: [3.6, 3.7, 3.8]
+        include:
+          - os: windows-latest
+            python-version: 3.8
+    runs-on: ${{ matrix.os }}
+    steps:
+      # HACK https://github.com/actions/cache/issues/315
+      - name: Enable msys binaries
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          echo "::add-path::C:\msys64\usr\bin"
+          rm C:\msys64\usr\bin\bash.exe
+      - run: git config --global user.name copier-ci
+        shell: bash
+      - run: git config --global user.email copier@copier
+        shell: bash
+      - run: git config --global core.autocrlf input
+        shell: bash
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: generate cache key PY
+        shell: bash
+        run:
+          echo "::set-env name=PY::$((python -VV; pip freeze) | sha256sum | cut -d' '
+          -f1)"
+      - uses: actions/cache@v2.1.0
+        with:
+          path: |
+            .cache
+            .venv
+          key:
+            cache|${{ runner.os }}|${{ env.PY }}|${{ hashFiles('pyproject.toml') }}|${{
+            hashFiles('poetry.lock') }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install poetry poetry-dynamic-versioning poethepoet
+          poetry run python -m pip install pip -U
+          poetry install
+      - name: Run pre-commit
+        shell: bash
+        run: poe lint --color=always
+        # FIXME Make pre-commit pass reliably on Windows, and remove this
+        continue-on-error: ${{ runner.os == 'Windows' }}
+      - name: Run mypy
+        shell: bash
+        run: poe types
+      - name: Run pytest
+        shell: bash
+        run: poe test -ra .
+
+  publish:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: generate cache key PY
+        run:
+          echo "::set-env name=PY::$((python -VV; pip freeze) | sha256sum | cut -d' '
+          -f1)"
+      - uses: actions/cache@v2.1.0
+        with:
+          path: |
+            .cache
+            .venv
+          key:
+            cache|${{ runner.os }}|${{ env.PY }}|${{ hashFiles('pyproject.toml') }}|${{
+            hashFiles('poetry.lock') }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install poetry poetry-dynamic-versioning
+      - name: Build dist
+        run: |
+          poetry build
+      - name: Publish distribution 📦 to Test PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.test_pypi_token_copier }}
+          repository_url: https://test.pypi.org/legacy/
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.pypi_token_copier }}

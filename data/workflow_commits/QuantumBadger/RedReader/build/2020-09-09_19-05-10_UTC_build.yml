@@ -1,0 +1,91 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+
+    pmd:
+        name: PMD
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run PMD
+                run: ./gradlew pmd
+
+    lint:
+        name: Android Lint
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run Android Lint
+                run: ./gradlew lint
+
+    checkstyle:
+        name: Code style
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run checkstyle
+                run: ./gradlew checkstyle
+
+    buildRelease:
+        name: Release build
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run release build
+                run: ./gradlew assembleRelease
+
+    buildDebug:
+        name: Debug build
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run debug build
+                run: ./gradlew assembleDebug
+
+            -   name: Upload artifact to GitHub
+                uses: actions/upload-artifact@v2
+                with:
+                    name: RedReader-debug.apk
+                    path: build/outputs/apk/debug/RedReader-debug.apk
+
+    unitTest:
+        name: Unit tests
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run unit tests
+                run: ./gradlew test
+
+    uiTest:
+        name: UI tests
+        runs-on: ubuntu-latest
+
+        strategy:
+            matrix:
+                api-level: [19, 21, 23, 29]
+                target: [default, google_apis]
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run UI tests
+                uses: reactivecircus/android-emulator-runner@v2
+                with:
+                    api-level: ${{ matrix.api-level }}
+                    target: ${{ matrix.target }}
+                    arch: x86
+                    profile: Nexus 6
+                    script: ./gradlew connectedAndroidTest

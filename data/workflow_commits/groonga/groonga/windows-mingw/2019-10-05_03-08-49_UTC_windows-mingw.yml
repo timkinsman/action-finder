@@ -1,0 +1,46 @@
+name: "Windows MinGW"
+on:
+  - push
+  - pull_request
+jobs:
+  build:
+    name: Build
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@master
+      - name: Install MSYS2
+        run: |
+          git clone ^
+            --depth 1 ^
+            https://github.com/msys2/msys2-ci-base.git ^
+            %CD:~0,2%\msys64
+      - name: Prepare environment
+        run: |
+          echo set MSYS_ROOT=%CD:~0,2%\msys64 >> env.bat
+          echo set PATH=%MSYS_ROOT%\mingw64\bin;%PATH% >> env.bat
+          echo set PATH=%MSYS_ROOT%\usr\bin;%PATH% >> env.bat
+          echo set MSYSTEM=MINGW64 >> env.bat
+      - name: Install dependencies
+        run: |
+          call env.bat
+          pacman --sync --noconfirm ^
+            mingw-w64-x86_64-zlib ^
+            ruby
+      - name: Generate configure
+        run: |
+          call env.bat
+          bash autogen.sh
+      - name: Run configure
+        run: |
+          call env.bat
+          bash configure ^
+            --with-ruby ^
+            --enable-mruby
+      - name: Build
+        run: |
+          call env.bat
+          make -j%NUMBER_OF_PROCESSORS%
+      - name: Install
+        run: |
+          call env.bat
+          make install

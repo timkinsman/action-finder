@@ -1,0 +1,33 @@
+name: python version support
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  python:
+    name: "Python"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python:
+          - 3.6.5
+          - 3.7.3
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install python version
+      uses: gabrielfalcao/pyenv-action@v4
+      with:
+        default: "${{ matrix.python }}"
+
+    - name: Unit Tests
+      run: make unit
+
+    - name: PyOpenSSL tests
+      run: make pyopenssl
+
+    - name: Functional Tests
+      run: make functional

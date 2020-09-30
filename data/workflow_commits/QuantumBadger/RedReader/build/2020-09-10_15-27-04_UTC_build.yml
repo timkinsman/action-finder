@@ -1,0 +1,51 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+
+    pmd:
+        name: PMD
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run PMD
+                run: ./gradlew pmd
+
+    checkstyle:
+        name: Code style
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run checkstyle
+                run: ./gradlew checkstyle
+
+    buildRelease:
+        name: Release build
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run release build
+                run: ./gradlew assembleRelease
+
+    buildDebug:
+        name: Debug build
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Run debug build
+                run: ./gradlew assembleDebug
+
+            -   name: Upload artifact to GitHub
+                uses: actions/upload-artifact@v2
+                with:
+                    name: RedReader-debug.apk
+                    path: build/outputs/apk/debug/RedReader-debug.apk

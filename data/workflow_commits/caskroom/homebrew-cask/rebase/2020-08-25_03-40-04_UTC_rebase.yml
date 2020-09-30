@@ -1,0 +1,20 @@
+name: Rebase Pull Request
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  rebase_pull_request:
+    name: Rebase Pull Request
+    if: github.event.issue.pull_request != '' && github.event.comment.author_association == 'MEMBER' && contains(github.event.comment.body, '@BrewTestBot rebase')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Pull Request
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Rebase Pull Request
+        uses: Homebrew/homebrew-cask/.github/actions/rebase@debug-rebase
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

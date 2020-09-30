@@ -1,0 +1,26 @@
+name: Ubuntu
+on: [push]
+jobs:
+  build:
+    strategy:
+      matrix:
+        ruby: [2.4.x, 2.5.x, 2.6.x]
+    runs-on: ubuntu-latest
+    name: RSpec
+    steps:
+    - uses: actions/checkout@master
+    - name: Set up Ruby ${{ matrix.ruby }}
+      uses: actions/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install libsqlite3-dev chromium-driver
+    - name: bundle install
+      run: |
+        gem install bundler
+        bundle update --bundler
+        bundle install --jobs 4 --retry 3
+    - name: Run RSpec
+      run: bundle exec rake

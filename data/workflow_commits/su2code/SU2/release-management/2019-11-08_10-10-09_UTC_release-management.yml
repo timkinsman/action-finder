@@ -1,0 +1,16 @@
+name: Release Management
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  update_draft_release:
+    name: Update Draft Release 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Drafter
+        uses: talbring/jenkins-release-drafter@v5.2.0-jenkins-5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

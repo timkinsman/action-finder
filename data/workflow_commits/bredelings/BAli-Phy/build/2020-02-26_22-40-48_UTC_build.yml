@@ -1,0 +1,124 @@
+name: Build and test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+    - "*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        name: [ubuntu-gcc-8,
+               ubuntu-gcc-9,
+               ubuntu-clang-9,
+               macos-xcode-11.3.1
+               ]
+
+        include:
+          - name: ubuntu-gcc-8
+            os: ubuntu-latest
+            compiler: gcc
+            version: "8"
+
+          - name: ubuntu-gcc-9
+            os: ubuntu-latest
+            compiler: gcc
+            version: "9"
+
+          - name: ubuntu-clang-9
+            os: ubuntu-latest
+            compiler: clang
+            version: "9"
+
+          - name: macos-xcode-11.3.1
+            os: macos-latest
+            compiler: xcode
+            version: "11.3.1"
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v1
+      with:
+        python-version: 3.8
+
+    - name: Install (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.version }}" = "9" ]; then
+          sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
+        fi
+        sudo apt-get update
+        sudo apt install -y pandoc libcairo2-dev ccache
+        sudo apt autoremove
+        sudo rm -rf /usr/local/share/boost
+        if [ "${{ matrix.compiler }}" = "gcc" ]; then
+          sudo apt-get install -y g++-${{ matrix.version }}
+          echo "::set-env name=CC::gcc-${{ matrix.version }}"
+          echo "::set-env name=CXX::g++-${{ matrix.version }}"
+        else
+          sudo apt-get install -y clang-${{ matrix.version }}
+          echo "::set-env name=CC::clang-${{ matrix.version }}"
+          echo "::set-env name=CXX::clang++-${{ matrix.version }}"
+        fi
+
+    - name: Install (macOS)
+      if: runner.os == 'macOS'
+      run: |
+          brew update
+          brew install pkg-config pandoc cairo ccache coreutils
+          sudo xcode-select -switch /Applications/Xcode_${{ matrix.version }}.app
+
+
+    - name: Install meson
+      run: |
+        python3 -mpip install meson ninja
+
+    # Caches for different branches are isolated, so we don't need to put the branch name into the key.
+    # The total size for all caches in a repository is 5Gb.
+
+    - name: Prepare ccache timestamp
+      id: ccache_cache_timestamp
+      run: |
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          stamp=$(date '+%s')
+        else
+          stamp=$(gdate '+%s')
+        fi
+        echo "${stamp}"
+        echo "::set-output name=timestamp::${stamp}"
+
+    - name: ccache cache files
+      uses: actions/cache@v1.1.0
+      with:
+         path: .ccache
+         key: ${{ matrix.config.name }}-ccache-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+         restore-keys: |
+           ${{ matrix.config.name }}-ccache-
+
+    - name: Configure
+      run: |
+        meson build --prefix=$HOME/local --buildtype=release
+
+    - name: Build
+      run: |
+        ninja -C build install -j4
+
+    - name: Test
+      run: |
+        export PATH=$HOME/local/bin:$PATH
+        echo ::group::Test suite
+        cd tests
+        ./run-tests.py bali-phy
+        cd
+        echo ::endgroup::
+        echo ::group::testiphy
+        git clone https://gitlab.com/testiphy/testiphy.git
+        cd testiphy
+        which bali-phy || true
+        ./testiphy bali-phy
+        echo ::endgroup::

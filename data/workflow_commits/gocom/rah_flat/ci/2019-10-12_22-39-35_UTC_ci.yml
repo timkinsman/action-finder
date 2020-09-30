@@ -1,0 +1,28 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Build
+      id: build
+      uses: gocom/action-textpattern-package-plugin@master
+
+    - name: Upload Compressed Plugin Installer Artifact
+      uses: actions/upload-artifact@master
+      with:
+        name: ${{ steps.build.outputs.name }}_v${{ steps.build.outputs.version }}_zip.txt
+        path: ${{ steps.build.outputs.compressed }}
+
+    - name: Upload Uncompressed Plugin Installer Artifact
+      uses: actions/upload-artifact@master
+      with:
+        name: ${{ steps.build.outputs.name }}_v${{ steps.build.outputs.version }}.txt
+        path: ${{ steps.build.outputs.uncompressed }}

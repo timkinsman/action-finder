@@ -1,0 +1,70 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node (12.x)
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+    - name: Install
+      run: npm install
+    - name: Build
+      run: npm run build
+    - name: Deploy
+      run: |
+        echo "============================"
+        echo "============================"
+        git --version
+        ssh -V
+        openssl version
+        echo "============================"
+        echo "============================"
+        git remote -v
+        git config --list
+        echo "============================"
+        echo "============================"
+        git config --global user.email "ikedanatsuko@team-lab.com"
+        git config --global user.name "ikedanatsuko"
+        git config --list
+        echo "============================"
+        echo "============================"
+        mkdir $HOME/.ssh
+        chmod 755 $HOME/.ssh
+        ls -al ~
+        echo "============================"
+        echo "============================"
+        echo -e $DEPLOY_KEY > $HOME/.ssh/id_rsa
+        # cat $HOME/.ssh/id_rsa
+        wc $HOME/.ssh/id_rsa
+        chmod 600 $HOME/.ssh/id_rsa
+        echo "============================"
+        echo "============================"
+        echo -e "HOST github.com\n\tUser git\n\tPort 22\n\tIdentityFile $HOME/.ssh/id_rsa\n\tStrictHostKeyChecking no" > $HOME/.ssh/config
+        cat $HOME/.ssh/config
+        chmod 644 $HOME/.ssh/config
+        ls -al ~/.ssh
+        echo "============================"
+        echo "============================"
+        git remote set-url origin git@github.com:team-lab/skillup.git
+        git config --list
+        echo "============================"
+        echo "============================"
+        touch $HOME/.ssh/known_hosts
+        chmod 644 $HOME/.ssh/known_hosts
+        # ssh-keyscan github.com >> $HOME/.ssh/known_hosts
+        # ssh-keygen -R github.com
+        ssh -vT git@github.com
+        echo "============================"
+        echo "============================"
+        npm run deploy
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}

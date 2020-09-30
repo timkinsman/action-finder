@@ -1,0 +1,34 @@
+name: MyGet Package Deploy
+
+on:
+    push:
+        branches:
+            - master
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+            - name: Setup .NET Core
+              uses: actions/setup-dotnet@v1
+              with:
+                dotnet-version: 3.1.100
+            - name: Build
+              run: dotnet build -c Release
+            - name: Test
+              run: |
+                cd test/Test
+                dotnet test
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+            - name: Get current timestamp
+              id: getCurrentTimestamp
+              run: echo "::set-output name=currentTimestamp::$(date +'%y%m%d%H%M')"
+            - name: Pack
+              run: dotnet pack -c Release --version-suffix ${{ github.run_number }}
+            - name: Push
+              run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.MYGET_API_KEY }} --source https://www.myget.org/F/supersocket/api/v3/index.json

@@ -1,0 +1,25 @@
+# GitHub Action to check our dictionary, this should only be used by the codespell project itself
+# For general usage in your repo, see the example in codespell.yml
+# https://github.com/codespell-project/codespell
+name: codespell
+on: [push, pull_request]
+jobs:
+  make-check-dictionaries:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v2
+      - uses: actions/checkout@v2
+      - name: Install general dependencies
+        run: pip install -U pip wheel # upgrade to latest pip find 3.5 wheels; wheel to avoid errors
+      - name: Install codespell dependencies
+        run: pip install -e ".[dev]"
+      - uses: codespell-project/sort-problem-matcher@v1
+      - run: make check-dictionaries
+
+  flake8-annotation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Flake8 with annotations
+        uses: TrueBrain/actions-flake8@v1.2

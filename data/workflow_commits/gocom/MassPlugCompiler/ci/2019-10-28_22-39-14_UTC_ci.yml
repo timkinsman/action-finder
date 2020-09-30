@@ -1,0 +1,24 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Build Phar
+      run: |
+        composer install
+        composer compile
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@master
+      with:
+        name: mtxpc.phar
+        path: ${{ github.workspace }}/build/mtxpc.phar

@@ -1,0 +1,238 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    - cron: '33 2 * * 1' # weekly, on Monday morning
+
+env:
+  ILIOS_MAILER_URL: null://localhost
+  ILIOS_LOCALE: en
+  ILIOS_SECRET: ThisTokenIsNotSoSecretChangeIt
+  ILIOS_FILE_SYSTEM_STORAGE_PATH: /tmp
+  SYMFONY_DEPRECATIONS_HELPER: disabled=1
+  latest_php: 7.4
+
+jobs:
+  code_style_security:
+    name: Code Style and Security
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use PHP ${{ env.latest_php }}
+      uses: shivammathur/setup-php@v1
+      with:
+        coverage: none
+        php-version: ${{ env.latest_php }}
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+    - uses: actions/cache@v1
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: install dependencies
+      run: composer install --no-interaction --prefer-dist
+    - name: lint PHP
+      run: vendor/bin/phpcs
+    - name: lint twig
+      run: bin/console lint:twig templates custom
+    - name: security check
+      run: bin/console security:check
+    - name: phpstan src
+      run: |
+        bin/console cache:warmup --env=dev
+        vendor/bin/phpstan analyse --no-progress
+    - name: phpstan tests
+      run: |
+        bin/console cache:warmup --env=test
+        bin/phpunit install
+        vendor/bin/phpstan analyse -c tests/phpstan.neon.dist tests --no-progress
+
+  fast_tests:
+    name: Fast Tests
+    needs: code_style_security
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-version: [7.4]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use PHP ${{ matrix.php-version }}
+      uses: shivammathur/setup-php@v1
+      with:
+        coverage: none
+        php-version: ${{ matrix.php-version }}
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+    - uses: actions/cache@v1
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: install dependencies
+      run: composer install --no-interaction --prefer-dist
+    - name: Run Tests
+      run: bin/phpunit --exclude-group api_1,api_2,api_3,api_4,api_5,mesh_data_import,cli,model
+
+  test_migrations_against_mysql:
+    name: Test Migrations Against MySQL
+    needs: code_style_security
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use PHP ${{ env.latest_php }}
+      uses: shivammathur/setup-php@v1
+      with:
+        coverage: none
+        php-version: ${{ env.latest_php }}
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+    - uses: actions/cache@v1
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: install dependencies
+      run: composer install --no-interaction --prefer-dist
+    - name: Drop, Create, Migrate, and Validate DB
+      env:
+        ILIOS_DATABASE_URL: mysql://root:root@127.0.0.1:3306/ilios?serverVersion=5.6
+      run: |
+        sudo /etc/init.d/mysql start
+        bin/console doctrine:database:drop --if-exists --force
+        bin/console doctrine:database:create
+        bin/console doctrine:migrations:migrate  --no-interaction
+        bin/console doctrine:schema:validate
+
+  api_tests:
+    name: PHPUnit Test Group
+    needs: code_style_security
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-version: [7.4]
+        group: [api_1, api_2, api_3, api_4, api_5, cli, mesh_data_import, model]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use PHP ${{ matrix.php-version }}
+      uses: shivammathur/setup-php@v1
+      with:
+        coverage: none
+        php-version: ${{ matrix.php-version }}
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+    - uses: actions/cache@v1
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: install dependencies
+      run: composer install --no-interaction --prefer-dist
+    - name: Test ${{ matrix.group }}
+      run: bin/phpunit --group ${{ matrix.group }}
+
+  run_twice:
+    name: PHPUnit Run Twice
+    needs: code_style_security
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-version: [7.4]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use PHP ${{ matrix.php-version }}
+      uses: shivammathur/setup-php@v1
+      with:
+        coverage: none
+        php-version: ${{ matrix.php-version }}
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+    - uses: actions/cache@v1
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: install dependencies
+      run: composer install --no-interaction --prefer-dist
+    - name: First Run
+      run: bin/phpunit --group twice
+    - name: Second Run
+      run: bin/phpunit --group twice
+
+  build_and_run_containers:
+    name: Build, Run, Test Containers
+    needs: code_style_security
+    runs-on: ubuntu-latest
+    env:
+      ILIOS_DATABASE_URL: mysql://root:root@127.0.0.1:3306/ilios?serverVersion=5.6
+      ILIOS_SECRET: DifferentSecret
+      ILIOS_FILE_SYSTEM_STORAGE_PATH: /tmp
+    steps:
+    - uses: actions/checkout@v1
+    - name: Drop, Create Database to use everywhere else
+      run: |
+        sudo /etc/init.d/mysql start
+        mysql -uroot -proot -e "DROP DATABASE IF EXISTS ilios"
+        mysql -uroot -proot -e "CREATE DATABASE ilios"
+    - name: Migrate Database
+      run: |
+        docker build --target migrate-database -t ilios-migrate-database .
+        docker run --name ilios-migrate-database -e ILIOS_SECRET -e ILIOS_DATABASE_URL -e ILIOS_FILE_SYSTEM_STORAGE_PATH --network=host ilios-migrate-database
+    - name: Consume Messages
+      run: |
+        docker build --target consume-messages -t ilios-consume-messages .
+        docker run -d --name ilios-consume-messages -e ILIOS_SECRET -e ILIOS_DATABASE_URL -e ILIOS_FILE_SYSTEM_STORAGE_PATH ilios-consume-messages
+        docker ps | grep -q ilios-consume-messages
+    - name: Apache PHP
+      run: |
+        docker build -t ilios-php-apache-test .
+        docker run -d --name ilios-php-apache-test -e ILIOS_SECRET -e ILIOS_DATABASE_URL -e ILIOS_FILE_SYSTEM_STORAGE_PATH ilios-php-apache-test
+        docker ps | grep -q ilios-php-apache-test
+        docker exec ilios-php-apache-test php /var/www/ilios/bin/console monitor:health
+    - name: Nginx
+      run: |
+        docker build --target nginx -t ilios-nginx .
+        docker run -d --name ilios-nginx ilios-nginx
+        docker ps | grep -q ilios-nginx
+    - name: FPM
+      run: |
+        docker build --target fpm -t ilios-fpm .
+        docker run -d --name ilios-fpm -e ILIOS_SECRET -e ILIOS_DATABASE_URL -e ILIOS_FILE_SYSTEM_STORAGE_PATH ilios-fpm
+        docker ps | grep -q ilios-fpm
+        docker exec ilios-fpm php /var/www/ilios/bin/console monitor:health
+    - name: FPM Dev
+      run: |
+        docker build --target fpm-dev -t ilios-fpm-dev .
+        docker run -d --name ilios-fpm-dev -e ILIOS_SECRET -e ILIOS_DATABASE_URL -e ILIOS_FILE_SYSTEM_STORAGE_PATH ilios-fpm-dev
+        docker ps | grep -q ilios-fpm-dev
+        docker exec ilios-fpm-dev php /var/www/ilios/bin/console monitor:health
+    - name: Admin
+      run: |
+        docker build --target admin -t ilios-admin .
+        docker run -d --name ilios-admin ilios-admin
+        docker ps | grep -q ilios-admin
+    - name: MySQL
+      run: |
+        docker build --target ilios-mysql -t ilios-mysql .
+        docker run -d --name ilios-mysql ilios-mysql
+        docker ps | grep -q ilios-mysql
+    - name: MySQL Demo
+      run: |
+        docker build --target ilios-mysql-demo -t ilios-mysql-demo .
+        docker run -d --name ilios-mysql-demo ilios-mysql-demo
+        docker ps | grep -q ilios-mysql-demo

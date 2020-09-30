@@ -1,0 +1,28 @@
+name: test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+
+    - name: Install package
+      run: |
+        make install-poetry
+        source $HOME/.poetry/env
+        make install
+
+    - name: List installed packages
+      run: poetry run pip freeze
+
+#    - name: Run linters
+#      run: make lint
+
+    - name: Run pytest via tox
+      run: make tox

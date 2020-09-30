@@ -1,0 +1,84 @@
+#--------------------------------------------------------------------------------------------------
+# \file  main.yml
+# \brief
+#
+# https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions
+#--------------------------------------------------------------------------------------------------
+
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.5.0
+        with:
+          access_token: ${{github.token}}
+
+      - name: xLib - Vheckout
+        uses: actions/checkout@v2
+        with:
+          repository: skynowa/xLib
+          path: ${{github.workspace}}/xLib
+
+      # xLib-data
+      - name: xLib-data - Vheckout
+        uses: actions/checkout@v2
+        with:
+          repository: skynowa/xLib-data
+          path: ${{github.workspace}}/xLib-data
+
+      - name: xLib-data - Install
+        run: cd ${{github.workspace}}/xLib-data/Libs/ubuntu-20.04 && ./install.sh
+
+      # Libs
+      - name: Libs - Install
+        run: cd ${{github.workspace}}/xLib/Tools && ./install_libs.sh
+
+      # Static Analysis
+      - name: Install - Static Analysis
+        run: |
+          cd ${{github.workspace}}/xLib/Tools/StaticAnalisis &&
+          ./install_cppcheck.sh &&
+          ./install_clang_tidy.sh &&
+          ./install_pvs_studio.sh &&
+          ./install_configs.sh ${{github.workspace}}/xLib-data/Configs/StaticAnalisis
+
+      # CMakeLib
+      - name: CMakeLib - checkout
+        uses: actions/checkout@v2
+        with:
+          repository: skynowa/CMakeLib
+          path: ${{github.workspace}}/CMakeLib
+
+      - name: CMakeLib - Install
+        run: cd ${{github.workspace}}/CMakeLib && ./install.sh
+
+        # xLib
+      - name: xLib - Configure
+        run: cd ${{github.workspace}}/xLib/Build && ./eclipse.sh
+
+      - name: Info
+      #  run: ./SystemInfoEx.sh && ./DevInfo.sh && env && exit 1
+        run: echo "github.workspace - ${{github.workspace}}" && ls -la
+
+      - name: xLib - Build
+        run: cd ${{github.workspace}}/xLib/Build && ./build.sh
+
+      # - name: xLib - Unit Tests (optional)
+      #   run: ./unit_tests.sh IpcSemaphore
+
+      - name: xLib - Tests
+        run: cd ${{github.workspace}}/xLib/Build && ./tests.sh
+
+  # build_windows:
+  #   runs-on: windows-2019

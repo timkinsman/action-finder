@@ -1,0 +1,282 @@
+name: "Windows MSVC"
+on:
+  - push
+  - pull_request
+jobs:
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        label:
+          - Visual Studio 2019 x64
+        include:
+          - label: Visual Studio 2019 x64
+            architecture: x64
+            artifact_name: vs-2019-x64
+            cmake_generator: Visual Studio 16 2019
+    runs-on: windows-latest
+    steps:
+      - name: Disable crash dialog
+        run: |
+          reg add "HKCU\SOFTWARE\Microsoft\Windows\Windows Error Reporting" `
+            /v DontShowUI `
+            /t REG_DWORD `
+            /d 1 `
+            /f
+      - name: Use JST
+        run: |
+          Set-TimeZone -Id "Tokyo Standard Time"
+      - uses: actions/setup-ruby@master
+      - uses: actions/checkout@master
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+      - name: Download bundled packages
+        run: |
+          cd vendor
+          ruby download_groonga_normalizer_mysql.rb
+          ruby download_lz4.rb
+          ruby download_mecab.rb
+          ruby download_message_pack.rb
+          ruby download_rapidjson.rb
+      - name: Generate env.ps1 and env.bat
+        run: |
+          echo "`$Env:CMAKE_BUILD_PARALLEL_LEVEL = ${Env:NUMBER_OF_PROCESSORS}" >> env.ps1
+          echo "set CMAKE_BUILD_PARALLEL_LEVEL=${Env:NUMBER_OF_PROCESSORS}" >> env.bat
+
+          $GROONGA_VERSION = (Get-Content base_version)
+          if (!("${Env:GITHUB_REF}".StartsWith("refs/tags/"))) {
+            $GROONGA_VERSION += "-$(${Env:GITHUB_SHA}.Substring(0, 7))"
+          }
+          echo "`$GROONGA_VERSION = `"${GROONGA_VERSION}`"" >> env.ps1
+          echo "set GROONGA_VERSION=${GROONGA_VERSION}" >> env.bat
+
+          $INSTALL_FOLDER = "groonga-${GROONGA_VERSION}-x64-vs2019"
+          $INSTALL_FOLDER_WITH_VCRUNTIME = "${INSTALL_FOLDER}-with-vcruntime"
+          # TODO: We need to change system locale to ja-JP to test installing
+          # to multibyte path works well but we can't change system locale
+          # to ja-JP on GitHub Actions...
+          # $INSTALL_PARENT_FOLDER = "インストール"
+          $INSTALL_PARENT_FOLDER = "install"
+          $FULL_INSTALL_FOLDER = `
+            "${Env:GITHUB_WORKSPACE}\${INSTALL_PARENT_FOLDER}\${INSTALL_FOLDER}"
+          echo "`$INSTALL_FOLDER = `"${INSTALL_FOLDER}`"" >> env.ps1
+          echo "set INSTALL_FOLDER=${INSTALL_FOLDER}" >> env.bat
+          echo "`$INSTALL_FOLDER_WITH_VCRUNTIME = `"${INSTALL_FOLDER_WITH_VCRUNTIME}`"" >> env.ps1
+          echo "set INSTALL_FOLDER_WITH_VCRUNTIME=${INSTALL_FOLDER_WITH_VCRUNTIME}" >> env.bat
+          echo "`$FULL_INSTALL_FOLDER = `"${FULL_INSTALL_FOLDER}`"" >> env.ps1
+          echo "set FULL_INSTALL_FOLDER=${FULL_INSTALL_FOLDER}" >> env.bat
+
+          $VC_PREFIX = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC"
+          echo "`$VC_PREFIX = `"${VC_PREFIX}`"" >> env.ps1
+          echo "set VC_PREFIX=${VC_PREFIX}" >> env.bat
+
+          Get-Content env.ps1
+          Get-Content env.bat
+      - name: Set version
+        run: |
+          . .\env.ps1
+          "GRN_VERSION=${GROONGA_VERSION}" | Set-Content version.sh
+      - name: Install Apache Arrow
+        run: |
+          . .\env.ps1
+          New-Item ..\apache-arrow-build -ItemType Directory
+          cmake `
+            -S vendor\apache-arrow-source\cpp `
+            -B ..\apache-arrow-build `
+            -A ${{ matrix.architecture }} `
+            -G "${{ matrix.cmake_generator }}" `
+            -DARROW_VERBOSE_THIRDPARTY_BUILD=ON `
+            -DBOOST_SOURCE=BUNDLED `
+            -DCMAKE_BUILD_TYPE=Release `
+            "-DCMAKE_INSTALL_PREFIX=${FULL_INSTALL_FOLDER}"
+          cmake --build ..\apache-arrow-build --config Release
+          cmake --build ..\apache-arrow-build --config Release --target Install
+      - name: Install dependencies
+        run: |
+          choco install -y winflexbison3
+      - name: Install Groonga
+        shell: cmd
+        run: |
+          call env.bat
+          set YACC="win_bison.exe"
+          call "%VC_PREFIX%\Auxiliary\Build\vcvars64.bat"
+          mkdir ..\groonga-build
+          cmake ^
+            -S . ^
+            -B ..\groonga-build ^
+            -A ${{ matrix.architecture }} ^
+            -G "${{ matrix.cmake_generator }}" ^
+            "-DCMAKE_INSTALL_PREFIX=%FULL_INSTALL_FOLDER%" ^
+            -DCMAKE_BUILD_TYPE=ReWithDebInfo ^
+            -DGRN_WITH_APACHE_ARROW=yes ^
+            -DGRN_WITH_MRUBY=yes
+          type ..\groonga-build\CMakeFiles\CMakeError.log
+          cmake --build ..\groonga-build --config RelWithDebInfo
+          cmake --build ..\groonga-build --config RelWithDebInfo --target Install
+
+      # Artifact
+      - name: Prepare artifacts without VC++ runtime
+        run: |
+          . .\env.ps1
+          New-Item artifacts -ItemType Directory
+          pushd "${FULL_INSTALL_FOLDER}\.."
+          Compress-Archive `
+            -Path "${INSTALL_FOLDER}" `
+            -DestinationPath "${Env:GITHUB_WORKSPACE}\artifacts\${INSTALL_FOLDER}.zip"
+          popd
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts
+      - name: Prepare artifacts with VC++ runtime
+        run: |
+          Set-PSDebug -Trace 2
+
+          . .\env.ps1
+          New-Item artifacts-with-vcruntime -ItemType Directory
+          pushd "${FULL_INSTALL_FOLDER}\.."
+
+          Copy-Item -Recurse `
+             "${INSTALL_FOLDER}" `
+             "${INSTALL_FOLDER_WITH_VCRUNTIME}"
+          $GROONGA_VC_REDIST_LICENSE_DIR = `
+            "${INSTALL_FOLDER_WITH_VCRUNTIME}\share\groonga\vcruntime"
+          New-Item `
+            -Path "${GROONGA_VC_REDIST_LICENSE_DIR}" `
+            -ItemType Directory
+
+          $VC_REDIST_VERSION = (Get-Content "${VC_PREFIX}\Auxiliary\Build\Microsoft.VCRedistVersion.default.txt")
+          $VC_REDIST_DIR = "${VC_PREFIX}\Redist\MSVC\${VC_REDIST_VERSION}\${{ matrix.architecture }}"
+          $VC_REDIST_VCRUNTIME = "${VC_REDIST_DIR}\Microsoft.VC142.CRT\vcruntime140.dll"
+          $VC_REDIST_VCRUNTIME_1 = "${VC_REDIST_DIR}\Microsoft.VC142.CRT\vcruntime140_1.dll"
+          $VC_REDIST_MSVCP = "${VC_REDIST_DIR}\Microsoft.VC142.CRT\msvcp140.dll"
+          Copy-Item `
+            "${VC_REDIST_VCRUNTIME}" `
+            "${INSTALL_FOLDER_WITH_VCRUNTIME}\bin"
+          Copy-Item `
+            "${VC_REDIST_VCRUNTIME_1}" `
+            "${INSTALL_FOLDER_WITH_VCRUNTIME}\bin"
+          Copy-Item `
+            "${VC_REDIST_MSVCP}" `
+            "${INSTALL_FOLDER_WITH_VCRUNTIME}\bin"
+          Copy-Item `
+            "${Env:GITHUB_WORKSPACE}\packages\windows\vcruntime\vs2019\readme.txt" `
+            "${GROONGA_VC_REDIST_LICENSE_DIR}"
+
+          $UCRT_REDIST_DIR = "C:\Program Files (x86)\Windows Kits\10\Redist\ucrt\DLLs\${{ matrix.architecture }}"
+          Copy-Item `
+            "${UCRT_REDIST_DIR}\*.dll" `
+            "${INSTALL_FOLDER_WITH_VCRUNTIME}\bin"
+          Copy-Item `
+            "${Env:GITHUB_WORKSPACE}\packages\windows\vcruntime\ucrt-readme.txt" `
+            "${GROONGA_VC_REDIST_LICENSE_DIR}"
+
+          Compress-Archive `
+            -Path ${INSTALL_FOLDER_WITH_VCRUNTIME} `
+            -DestinationPath "${Env:GITHUB_WORKSPACE}\artifacts-with-vcruntime\${INSTALL_FOLDER_WITH_VCRUNTIME}.zip"
+          popd
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ matrix.artifact_name }}-with-vcruntime
+          path: artifacts-with-vcruntime
+
+      # Release
+      - name: Asset
+        if: |
+          startsWith(github.ref, 'refs/tags/')
+        id: asset
+        run: |
+          . .\env.ps1
+          Write-Output "::set-output name=base_name::${INSTALL_FOLDER}"
+      - name: Ensure creating release
+        if: |
+          startsWith(github.ref, 'refs/tags/')
+        id: create-release
+        uses: actions/github-script@0.4.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor
+            const fs = require("fs");
+            const path = ".github/workflows/ensure-creating-release.js";
+            const script = fs.readFileSync(path).toString();
+            const func = new AsyncFunction("require", "github", "context", script);
+            return await func(require, github, context);
+      - name: Upload the artifact without VC++ runtime to release
+        uses: actions/upload-release-asset@v1.0.1
+        if: |
+          startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.result }}
+          asset_path: artifacts/${{ steps.asset.outputs.base_name }}.zip
+          asset_name: ${{ steps.asset.outputs.base_name }}.zip
+          asset_content_type: application/zip
+      - name: Upload the artifact with VC++ runtime to release
+        uses: actions/upload-release-asset@v1.0.1
+        if: |
+          startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.result }}
+          asset_path: artifacts-with-vcruntime/${{ steps.asset.outputs.base_name }}-with-vcruntime.zip
+          asset_name: ${{ steps.asset.outputs.base_name }}-with-vcruntime.zip
+          asset_content_type: application/zip
+
+      # Test
+      - name: Update MSYS2
+        run: |
+          ridk exec pacman --sync --refresh --noconfirm msys2-runtime
+          ridk exec pacman --sync --refresh --noconfirm pacman
+          ridk exec pacman --sync --refresh --sysupgrade --noconfirm
+      - name: Update GCC
+        run: |
+          ridk exec pacman --sync --noconfirm mingw-w64-x86_64-gcc
+      - name: Install grntest
+        run: |
+          git clone --depth 1 `
+            https://github.com/groonga/grntest.git `
+            ..\grntest
+          cd ..\grntest
+          bundle install
+          bundle exec ruby -rdevkit -S rake install
+          gem install red-arrow
+      - name: "Test: command line"
+        run: |
+          . .\env.ps1
+          ruby test\command_line\run-test.rb `
+            --groonga-install-prefix="${FULL_INSTALL_FOLDER}"
+      - name: "Test: HTTP: reference count"
+        run: |
+          . .\env.ps1
+          $Env:GRN_ENABLE_REFERENCE_COUNT = "yes"
+          grntest `
+            --base-directory test\command `
+            --groonga "${FULL_INSTALL_FOLDER}\bin\groonga.exe" `
+            --interface http `
+            --n-retries 2 `
+            --n-workers ${Env:NUMBER_OF_PROCESSORS} `
+            --read-timeout 30 `
+            --reporter mark `
+            --timeout 60 `
+            test\command\suite
+      - name: "Test: HTTP: Apache Arrow: chunked"
+        run: |
+          . .\env.ps1
+          grntest `
+            --base-directory test\command `
+            --groonga "${FULL_INSTALL_FOLDER}\bin\groonga.exe" `
+            --input-type apache-arrow `
+            --interface http `
+            --n-retries 2 `
+            --n-workers ${Env:NUMBER_OF_PROCESSORS} `
+            --read-timeout 30 `
+            --reporter mark `
+            --timeout 360 `
+            --use-http-chunked `
+            test\command\suite

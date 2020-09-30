@@ -1,0 +1,85 @@
+name: Package
+on:
+  push:
+    branches:
+      - "*"
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+  schedule:
+    - cron: |
+        0 0 * * *
+jobs:
+  linux:
+    name: Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        package-id:
+          - postgresql-12-pgroonga-debian-buster
+          - postgresql-12-pgroonga-debian-buster-i386
+          - postgresql-12-pgroonga-centos-8
+          - postgresql-12-pgroonga-centos-7
+          - postgresql-12-pgroonga-centos-6
+          - postgresql-11-pgroonga-debian-buster
+          - postgresql-11-pgroonga-debian-buster-i386
+          - postgresql-11-pgroonga-debian-stretch
+          - postgresql-11-pgroonga-debian-stretch-i386
+          - postgresql-11-pgroonga-centos-7
+          - postgresql-11-pgroonga-centos-6
+          - postgresql-10-pgroonga-debian-stretch
+          - postgresql-10-pgroonga-debian-stretch-i386
+          - postgresql-10-pgroonga-centos-7
+          - postgresql-10-pgroonga-centos-6
+          - postgresql-9.6-pgroonga-debian-stretch
+          - postgresql-9.6-pgroonga-debian-stretch-i386
+          - postgresql-9.6-pgroonga-centos-7
+          - postgresql-9.6-pgroonga-centos-6
+          - postgresql-9.5-pgroonga-centos-7
+          - postgresql-9.5-pgroonga-centos-6
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt -y -V install ruby
+          sudo gem install bundler
+          bundle install
+      - name: Clone dependencies
+        run: |
+          cd ..
+          git clone https://github.com/apache/arrow.git
+      - name: Build archive
+        run: |
+          rake dist
+      - name: Build with Docker
+        run: |
+          set -x
+          package=$(echo ${{ matrix.package-id }} | \
+                      sed -E -e 's/-(debian|centos).*$//g')
+          os=$(echo ${{ matrix.package-id }} | \
+                 sed -E -e 's/^.*-((debian|centos).*)$/\1/g')
+          cd packages/${package}
+          rake version:update
+          case ${os} in
+            debian-*)
+              rake apt:build APT_TARGETS=${os}
+              mv apt/repositories/ ../../
+              ;;
+            centos-*)
+              rake yum:build YUM_TARGETS=${os}
+              mv yum/repositories/ ../../
+              ;;
+          esac
+        env:
+          APACHE_ARROW_REPOSITORY: ../../../arrow
+      - uses: actions/upload-artifact@master
+        with:
+          name: packages-${{ matrix.package-id }}
+          path: repositories/

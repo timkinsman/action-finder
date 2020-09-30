@@ -1,0 +1,10 @@
+name: Main Workflow
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+        uses: docker://hivesolutions/python
+      - run: pwd
+      - run: ls -la
+      - run: pip install -r requirements.txt

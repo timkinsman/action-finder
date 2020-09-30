@@ -1,0 +1,32 @@
+name: Update Publix Suffix List data
+on:
+  schedule:
+    - cron: '0 0 * * 6'
+
+jobs:
+  update-publicsuffix-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Initialize git config
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email noreply@github.com
+
+      - name: Download new publicsuffix data
+        run: curl -L https://github.com/mozilla-mobile/android-components/raw/master/components/lib/publicsuffixlist/src/main/assets/publicsuffixes -o app/src/main/assets/publicsuffixes
+
+      - name: Compare list changes
+        run: if [[ $(git diff --binary --stat) != '' ]]; then echo "::set-env name=UPDATED::true"; fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        if: env.UPDATED == 'true'
+        with:
+          commit-message: Update Public Suffix List data
+          branch: bot/update-psl
+          base: develop
+          title: 'Update Public Suffix List data'
+          assignees: msfjarvis

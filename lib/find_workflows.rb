@@ -18,7 +18,9 @@ def find_workflows(user, pass, input, output, dir)
       spinner.auto_spin
 
       begin
+        client = authenticate(user, pass)
         check_rate_limit(client, 0, spinner)
+        
         if client.repository?(row[0])
           workflows = client.contents(row[0], path: '.github/workflows')
           arr = []

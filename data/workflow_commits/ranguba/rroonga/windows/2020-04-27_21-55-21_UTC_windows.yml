@@ -1,0 +1,38 @@
+name: Windows
+on:
+  - push
+  - pull_request
+jobs:
+  test:
+    name: Test
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version:
+          - "2.5"
+          - "2.6"
+          - "2.7"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+      - name: Update MSYS2
+        run: |
+          ridk exec pacman --sync -yy -uu --noconfirm
+      - name: Install dependencies for building gem
+        run: |
+          gem install `
+            packnga `
+            yard
+      - name: Build gem
+        run: |
+          rake build
+      - name: Install gem
+        run: |
+          gem install pkg\*.gem
+      - name: Test
+        run: |
+          $Env:NO_MAKE = "yes"
+          ruby test\run-test.rb

@@ -1,0 +1,120 @@
+name: Package
+on:
+  push:
+    branches:
+      - "*"
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+  schedule:
+    - cron: |
+        0 0 * * *
+jobs:
+  build:
+    name: Build
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - debian-stretch
+          - debian-stretch-i386
+          - debian-buster
+          - debian-buster-i386
+          - centos-6
+          - centos-7
+          - centos-8
+        package:
+          - mariadb-10.1
+        exclude:
+          - os: debian-buster
+            package: mariadb-10.1
+          - os: debian-buster-i386
+            package: mariadb-10.1
+          - os: centos-8
+            package: mariadb-10.1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 1
+      - name: Install dependencies
+        run: |
+          grep '^deb ' /etc/apt/sources.list | \
+            sed -e 's/^deb /deb-src /' | \
+            sudo tee /etc/apt/sources.list.d/source.list
+          sudo apt update
+          sudo apt -y -V install software-properties-common
+          sudo add-apt-repository -y universe
+          sudo add-apt-repository -y ppa:groonga/ppa
+          sudo apt update
+          sudo apt -y -V install \
+            autoconf \
+            gettext \
+            groonga-normalizer-mysql \
+            libgroonga-dev \
+            libmysqld-dev \
+            libtool \
+            python3-pip \
+            ruby
+      - name: Install Sphinx
+        run: |
+          sudo pip3 install -v sphinx
+      - name: Download MySQL source
+        run: |
+          mkdir -p ../mysql
+          cd ../mysql
+          apt source mysql-server
+          ln -s $(find . -maxdepth 1 -type d | sort | tail -1) mysql
+      - name: Clone dependencies
+        run: |
+          cd ..
+          git clone --depth 1 https://github.com/apache/arrow.git
+          git clone --depth 1 https://github.com/clear-code/cutter.git
+          git clone --depth 1 https://github.com/mroonga/mroonga.github.com.git
+      - name: Generate configure
+        run: |
+          ./autogen.sh
+      - name: Configure for archive
+        run: |
+          ./configure \
+            --enable-document \
+            --with-cutter-source-path=../cutter \
+            --with-mroonga-github-com-path=../mroonga.github.com \
+            --with-mysql-source=../mysql/mysql
+      - name: Build archive
+        run: |
+          make dist
+      - name: Update version
+        run: |
+          changelog=packages/${{ matrix.package }}-mroonga/debian/changelog
+          OLD_RELEASE=$(grep -E -o '[0-9.]+' ${changelog} | \
+                          head -n1)
+          OLD_RELEASE_DATE_FULL="$(grep '^ -- ' ${changelog} | \
+                                     head -n1 | \
+                                     sed -E -e 's/ -- .+<[^>]+>  //')"
+          OLD_RELEASE_DATE=$(date --date="${OLD_RELEASE_DATE_FULL}" +%Y-%m-%d)
+          make update-latest-release \
+            OLD_RELEASE=${OLD_RELEASE} \
+            OLD_RELEASE_DATE=${OLD_RELEASE_DATE} \
+            NEW_RELEASE_DATE=$(date +%Y-%m-%d)
+      - name: Build with Docker
+        run: |
+          cd packages/${{ matrix.package }}-mroonga
+          case ${{ matrix.os }} in
+            debian-*)
+              rake apt:build APT_TARGETS=${{ matrix.os }}
+              mv apt/repositories/ ../../
+              ;;
+            centos-*)
+              rake yum:build YUM_TARGETS=${{ matrix.os }}
+              mv yum/repositories/ ../../
+              ;;
+          esac
+        env:
+          APACHE_ARROW_REPOSITORY: ../../../arrow
+      - uses: actions/upload-artifact@master
+        with:
+          name: packages-${{ matrix.package }}-${{ matrix.os }}
+          path: repositories/

@@ -1,0 +1,33 @@
+name: csound_builds
+
+on: 
+  push:
+    branches:
+      - develop
+      - master
+    pull_request:
+      branches:
+        - develop
+jobs:
+  emscripten_build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: run the Docker image
+        run: docker run --name csound_test_run -i sjamble/csound_emscripten
+      - name: copying build out of container
+        run: docker cp csound_test_run:/csound/Emscripten/csound-web-6.15.0.zip .
+      - uses: actions/upload-artifact@v2
+        with:
+          name: csound-web-6.15.0.zip
+          path: .
+  android_build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: run the Docker image
+        run: docker run --name csound_test_run -i sjamble/csound_android
+      - name: copying build out of container
+        run: docker cp csound_test_run:/csound/Android/Csound6.14.0-Android.zip .
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Csound6.14.0-Android.zip
+          path: .

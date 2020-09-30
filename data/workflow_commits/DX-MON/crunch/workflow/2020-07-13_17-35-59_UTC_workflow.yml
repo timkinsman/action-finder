@@ -1,0 +1,58 @@
+name: GitHub Actions
+
+on:
+  push:
+    branches-ignore:
+      - 'coverityScan'
+
+jobs:
+  build-windows:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [windows-2019]
+        arch: ['amd64', 'x86']
+        coverage: [false]
+      fail-fast: false
+    env:
+      CC: cl.exe
+      CXX: cl.exe
+      LD: link.exe
+    steps:
+      - name: Chekcout crunch
+        uses: actions/checkout@v2
+        with:
+          lfs: true
+          submodules: true
+      - name: Runtime Environment
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" %ARCH%
+          bash ${{ github.workspace }}/.github/exportEnv.sh
+        env:
+          ARCH: ${{ matrix.arch }}
+      - name: Setup Meson + Ninja
+        shell: bash
+        run: |
+          curl -L1O https://github.com/ninja-build/ninja/releases/download/v1.10.0/ninja-win.zip
+          python -m pip install --upgrade pip setuptools wheel
+          pip3 install meson
+          unzip ninja-win.zip -d /c/windows/system32
+          rm ninja-win.zip
+        working-directory: ${{ runner.temp }}
+      - name: Version tools
+        shell: bash
+        run: |
+          $CC || true
+          $LD || true
+          meson --version
+          ninja --version
+      - name: Configure
+        run: meson build --prefix=$HOME/.local -Db_coverage=${{ matrix.coverage }} $BUILD_OPTS
+      - name: Build
+        run: ninja -C build
+      - name: Test
+        run: ninja -C build test
+      - name: Codecov
+        if: success() && matrix.coverage
+        run: bash <(curl -s https://codecov.io/bash) -x "$GCOV";

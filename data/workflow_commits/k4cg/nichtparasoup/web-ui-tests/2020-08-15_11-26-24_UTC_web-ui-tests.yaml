@@ -1,0 +1,83 @@
+# GitHubActions for testing
+# read the docs: https://help.github.com/en/actions/configuring-and-managing-workflows/configuring-a-workflow
+
+name: Test WebUi
+
+on:
+  push:
+    branches:
+      - 'master'
+      - '3.0-dev'
+      - 'sonar/coverage_draft1'
+    paths:
+      - '.github/workflows/web-ui-tests.yaml'
+      - 'web-ui/**'
+      - '!web-ui/docs/**'
+      - '!web-ui/**.md'
+      - '!web-ui/**.rst'
+      - '!web-ui/LICENSE'
+  pull_request:
+    branches:
+      - 'master'
+      - '3.0-dev'
+    paths:
+      - '.github/workflows/web-ui-tests.yaml'
+      - 'web-ui/**'
+      - '!web-ui/docs/**'
+      - '!web-ui/**.md'
+      - '!web-ui/**.rst'
+      - '!web-ui/LICENSE'
+
+defaults:
+  run:
+    working-directory: web-ui
+
+jobs:
+  sonarcloud:
+    name: SonarScanner
+    # have forks backed-up: Anyone without write access to a repository cannot read and use secrets
+    if: ${{ github.repository_owner == 'k4cg' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Code
+        # see https://github.com/actions/checkout
+        uses: actions/checkout@v2
+        with:
+          # Disabling shallow clone is recommended for improving relevancy of reporting
+          fetch-depth: 0
+      - name: SonarCloud Scan
+        # have PRs backed-up: Anyone without write access to a repository cannot read and use secrets
+        continue-on-error: true
+        # see https://github.com/SonarSource/sonarcloud-github-action
+        uses: sonarsource/sonarcloud-github-action@master
+        with:
+          projectBaseDir: web-ui
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  codeql:
+    # see https://github.com/github/codeql-action
+    name: CodeQL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Code
+        # see https://github.com/actions/checkout
+        uses: actions/checkout@v2
+        with:
+          # We must fetch at least the immediate parents so that if this is
+          # a pull request then we can checkout the head.
+          fetch-depth: 2
+      - run: git checkout HEAD^2
+        # If this run was triggered by a pull request event, then checkout
+        # the head of the pull request instead of the merge commit.
+        if: ${{ github.event_name == 'pull_request' }}
+      - name: Initialize CodeQL
+        # see https://github.com/github/codeql-action
+        uses: github/codeql-action/init@v1
+        with:
+          languages: javascript
+          config-file: ./.github/codeql/web-ui.yaml
+      - name: Perform CodeQL Analysis
+        # see https://github.com/github/codeql-action
+        uses: github/codeql-action/analyze@v1

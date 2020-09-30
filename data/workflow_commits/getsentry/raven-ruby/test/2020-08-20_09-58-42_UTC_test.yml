@@ -1,0 +1,77 @@
+name: Test
+
+on: 
+  push:
+    branches:
+      - master
+      - release/**
+  pull_request:
+jobs:
+  test:
+    name: Test on ruby ${{ matrix.ruby_version }} and rails ${{ matrix.rails_version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        rails_version: [0, 4.2, 5.2, 6.0]
+        ruby_version: [2.3, 2.4, 2.5, 2.6, 2.7, jruby, head]
+        os: [ubuntu-latest]
+        include:
+          - ruby_version: head
+            rails_version: 0
+          - ruby_version: 2.7
+            rails_version: 6.0
+            env: RUBYOPT="--enable-frozen-string-literal --debug=frozen-string-literal"
+        exclude:
+          - ruby_version: 2.3
+            rails_version: 6.0
+          - ruby_version: 2.4
+            rails_version: 6.0
+          - ruby_version: 2.7
+            rails_version: 4.2
+          - ruby_version: head
+            rails_version: 4.2
+          - ruby_version: head
+            rails_version: 5.2
+          - ruby_version: head
+            rails_version: 6.0
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Set up Ruby ${{ matrix.ruby_version }}
+      uses: ruby/setup-ruby@v1
+      with:
+        bundler: 1
+        ruby-version: ${{ matrix.ruby_version }}
+
+    - name: Build with Rails ${{ matrix.rails_version }}
+      env:
+        RAILS_VERSION: ${{ matrix.rails_version }}
+      run: | 
+        bundle install --jobs 4 --retry 3
+        bundle exec rake
+
+  job_zeus:
+    name: Zeus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.6 # Not needed with a .ruby-version file
+      - run: bundle install
+      - name: Install Zeus
+        run: |
+          yarn global add @zeus-ci/cli
+          echo "::add-path::$(yarn global bin)"
+      - name: Upload to Zeus
+        env:
+          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
+          ZEUS_HOOK_BASE: ${{ secrets.ZEUS_HOOK_BASE }}
+        run: |
+          zeus job update -b $GITHUB_RUN_ID -j $GITHUB_RUN_NUMBER -r $GITHUB_SHA
+          gem build sentry-raven.gemspec
+          zeus upload -b $GITHUB_RUN_ID -j $GITHUB_RUN_NUMBER -t "application/tar+gem" ./*.gem
+          zeus job update --status=passed -b $GITHUB_RUN_ID -j $GITHUB_RUN_NUMBER -r $GITHUB_SHA

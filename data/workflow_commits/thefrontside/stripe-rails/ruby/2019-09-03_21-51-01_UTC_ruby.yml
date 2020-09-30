@@ -1,0 +1,32 @@
+name: Ruby
+
+on: [push]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ruby: [2.3.x, 2.4.x, 2.5.x, 2.6.x]
+        gemfile: [Gemfile, gemfiles/rails4.gemfile]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Ruby 2.6
+      uses: actions/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Build
+      env:
+        BUNDLE_GEMFILE: ${{ matrix.gemfile }}
+      run: |
+        gem install bundler -v 1.17.3
+        bundle install --jobs 4 --retry 3
+        bundle exec rake
+    - name: Test
+      env:
+        BUNDLE_GEMFILE: ${{ matrix.gemfile }}
+      run: |
+        bundle exec rake

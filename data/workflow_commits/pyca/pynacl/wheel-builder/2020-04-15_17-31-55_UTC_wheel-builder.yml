@@ -1,0 +1,148 @@
+name: Wheel Builder
+on:
+  repository_dispatch:
+    types: [wheel-builder]
+
+jobs:
+  manylinux:
+    runs-on: ubuntu-latest
+    container: pyca/cryptography-manylinux1:x86_64
+    strategy:
+      matrix:
+        PYTHON: ["cp27-cp27m", "cp27-cp27mu", "cp35-cp35m"]
+    name: "Python ${{ matrix.PYTHON }} for manylinux1"
+    steps:
+      - run: /opt/python/${{ matrix.PYTHON }}/bin/python -m virtualenv .venv
+      - name: Downgrade pip, can't remember why
+        run: .venv/bin/pip install -U pip==10.0.1
+      - name: Install python dependencies
+        run: .venv/bin/pip install cffi six
+      - run: |
+          REGEX="cp3([0-9])*"
+          if [[ "${{ matrix.PYTHON }}" =~ $REGEX ]]; then
+              PY_LIMITED_API="--build-option --py-limited-api=cp3${BASH_REMATCH[1]}"
+          fi
+          .venv/bin/pip wheel pynacl==${{ github.event.client_payload.BUILD_VERSION }} --no-binary pynacl --no-deps --wheel-dir=tmpwheelhouse $PY_LIMITED_API
+      - run: auditwheel repair tmpwheelhouse/PyNaCl*.whl -w wheelhouse/
+      - run: .venv/bin/pip install pynacl --no-index -f wheelhouse/
+      - run: |
+          .venv/bin/python -c "import nacl.signing; key = nacl.signing.SigningKey.generate();signature = key.sign(b'test'); key.verify_key.verify(signature)"
+
+      - run: mkdir pynacl-wheelhouse
+      - run: mv wheelhouse/PyNaCl*.whl pynacl-wheelhouse/
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "pynacl-${{ github.event.client_payload.BUILD_VERSION }}-manylinux1-${{ matrix.PYTHON }}"
+          path: pynacl-wheelhouse/
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        PYTHON:
+          - {VERSION: '2.7', ABI_VERSION: '2.7'}
+          - {VERSION: '3.8', ABI_VERSION: '3.5'}
+    name: "Python ${{ matrix.PYTHON.VERSION }} on macOS"
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.PYTHON.VERSION }}
+
+      # Downgrade pip, I can't remember why
+      - run: pip install -U pip==10.0.1
+      - run: pip install -U wheel cffi six
+
+      - name: Build the wheel
+        run: |
+            REGEX="3\.([0-9])*"
+            if [[ "$PYTHON_VERSION" =~ $REGEX ]]; then
+                PY_LIMITED_API="--build-option --py-limited-api=cp3${BASH_REMATCH[1]}"
+            fi
+
+            pip wheel pynacl==${{ github.event.client_payload.BUILD_VERSION }} --wheel-dir=wheelhouse --no-binary pynacl --no-deps $PY_LIMITED_API
+        env:
+          PYTHON_VERSION: ${{ matrix.PYTHON.ABI_VERSION }}
+      - run: pip install -f wheelhouse --no-index pynacl
+      - run: |
+          python -c "import nacl.signing; key = nacl.signing.SigningKey.generate();signature = key.sign(b'test'); key.verify_key.verify(signature)"
+
+      - run: mkdir pynacl-wheelhouse
+      - run: mv wheelhouse/PyNaCl*.whl pynacl-wheelhouse/
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "pynacl-${{ github.event.client_payload.BUILD_VERSION }}-macOS-${{ matrix.PYTHON.VERSION }}"
+          path: pynacl-wheelhouse/
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        WINDOWS:
+          - {ARCH: 'x86', SODIUM_ARCH: 'Win32', VS_ARCH: 'x86'}
+          - {ARCH: 'x64', SODIUM_ARCH: 'x64', VS_ARCH: 'amd64'}
+        PYTHON:
+          - {VERSION: "2.7", SODIUM_MSVC_VERSION: "v100"}
+          - {VERSION: "3.5", SODIUM_MSVC_VERSION: "v140"}
+          - {VERSION: "3.6", SODIUM_MSVC_VERSION: "v140"}
+          - {VERSION: "3.7", SODIUM_MSVC_VERSION: "v140"}
+          - {VERSION: "3.8",  SODIUM_MSVC_VERSION: "v140"}
+    name: "Python ${{ matrix.PYTHON.VERSION }} on Windows ${{ matrix.WINDOWS.ARCH }}"
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.PYTHON.VERSION }}
+          architecture: ${{ matrix.WINDOWS.ARCH }}
+      - name: Install MSVC for Python 2.7
+        run: |
+            Invoke-WebRequest -Uri https://download.microsoft.com/download/7/9/6/796EF2E4-801B-4FC4-AB28-B59FBF6D907B/VCForPython27.msi -OutFile VCForPython27.msi
+            Start-Process msiexec -Wait -ArgumentList @('/i', 'VCForPython27.msi', '/qn', 'ALLUSERS=1')
+            Remove-Item VCForPython27.msi -Force
+        shell: powershell
+        if: matrix.PYTHON.VERSION == '2.7'
+
+      - name: Extract libsodium libraries
+        run: |
+          Expand-Archive src/libsodium-1.0.18-msvc.zip -DestinationPath c:\
+        shell: powershell
+      - name: Add sodium to paths
+        run: |
+          echo "::set-env name=INCLUDE::C:/libsodium/include;%INCLUDE%"
+          echo "::set-env name=LIB::C:/libsodium/${{ matrix.WINDOWS.SODIUM_ARCH }}/release/${{ matrix.PYTHON.SODIUM_MSVC_VERSION }}/static;%LIB%"
+
+      - name: Copy stdint.h to include dir (distant weeping)
+        run: mv .github/stdint-nonsense/stdint.h C:/libsodium/include/stdint.h
+        if: matrix.PYTHON.VERSION == '2.7'
+      - name: Install wheel and our Python dependencies
+        run: pip install wheel cffi six
+
+      - name: Build the wheel (py2)
+        run: pip wheel pynacl==${{ github.event.client_payload.BUILD_VERSION }} --no-use-pep517 --wheel-dir=wheelhouse --no-binary pynacl
+        env:
+          PYNACL_SODIUM_LIBRARY_NAME: sodium
+          PYNACL_SODIUM_STATIC: 1
+          SODIUM_INSTALL: system
+        if: matrix.PYTHON.VERSION == '2.7'
+      - name: Build the wheel (py3)
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat" -no_logo -arch=${{ matrix.WINDOWS.VS_ARCH }}
+          pip wheel pynacl==${{ github.event.client_payload.BUILD_VERSION }} --no-use-pep517 --wheel-dir=wheelhouse --no-binary pynacl
+        shell: cmd
+        env:
+          PYNACL_SODIUM_LIBRARY_NAME: sodium
+          PYNACL_SODIUM_STATIC: 1
+          SODIUM_INSTALL: system
+        if: matrix.PYTHON.VERSION != '2.7'
+
+      - name: Test installing the wheel
+        run: pip install -f wheelhouse pynacl --no-index
+      - name: Test the installed wheel
+        run: |
+          python -c "import nacl.signing; key = nacl.signing.SigningKey.generate();signature = key.sign(b'test'); key.verify_key.verify(signature)"
+      - run: mkdir pynacl-wheelhouse
+      - run: move wheelhouse\PyNaCl*.whl pynacl-wheelhouse\
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "pynacl-${{ github.event.client_payload.BUILD_VERSION }}-win-${{ matrix.WINDOWS.ARCH }}-${{ matrix.PYTHON.VERSION }}"
+          path: pynacl-wheelhouse\

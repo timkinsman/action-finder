@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  NODE_VERSION: 12.x
+  RUBY_VERSION: 2.6
+  TF_VERSION: 0.12.20
+
+jobs:
+  terraform_plan:
+    strategy:
+      max-parallel: 1
+
+      matrix:
+        tf_workspace: [staging, production, global]
+        include:
+          - tf_workspace: staging
+            tf_dir: terraform/app_environment
+          - tf_workspace: production
+            tf_dir: terraform/app_environment
+          - tf_workspace: global
+            tf_dir: terraform/app_global
+
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
+      DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+      DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_EMAIL: ${{ secrets.HEROKU_EMAIL }}
+      TF_WORKSPACE: ${{ matrix.tf_workspace }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: 'Terraform Init'
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: ${{ env.TF_VERSION }}
+          tf_actions_subcommand: 'init'
+          tf_actions_working_dir: ${{ matrix.tf_dir }}
+
+      - name: 'Terraform Format'
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: ${{ env.TF_VERSION }}
+          tf_actions_subcommand: 'fmt'
+          tf_actions_working_dir: ${{ matrix.tf_dir }}
+
+      - name: 'Terraform Validate'
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: ${{ env.TF_VERSION }}
+          tf_actions_subcommand: 'validate'
+          tf_actions_working_dir: ${{ matrix.tf_dir }}
+
+      - name: 'Terraform Plan'
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: ${{ env.TF_VERSION }}
+          tf_actions_subcommand: 'plan'
+          tf_actions_working_dir: ${{ matrix.tf_dir }}
+        env:
+          TF_CLI_ARGS: -lock=false
+
+      - run: ./bin/git_changes
+
+  test_ruby:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:10.11-alpine
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: nanasess/setup-chromedriver@master
+
+      - run: sudo apt-get --yes --quiet install libpq-dev
+
+      - name: Cache gems
+        uses: actions/cache@v1
+        with:
+          path: vendor/bundle
+          key: gems-${{ hashFiles('.ruby-version') }}-${{ hashFiles('Gemfile.lock') }}
+          restore-keys: gems-${{ hashFiles('.ruby-version') }}-
+
+      - name: Cache yarn
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: yarn-${{ hashFiles('.nvmrc') }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ hashFiles('.nvmrc') }}-
+
+      - run: ./bin/setup
+
+      - run: RAILS_ENV=test ./bin/rails webpacker:compile
+
+      - run: ./bin/test
+
+      - run: ./bin/quality
+
+      - run: ./bin/git_changes
+
+  automerge:
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+
+    needs: [terraform_plan, test_ruby]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@0.2.0
+        with:
+          script: |
+            github.pullRequests.merge({
+              owner: context.payload.repository.owner.login,
+              repo: context.payload.repository.name,
+              pull_number: context.payload.pull_request.number
+            })
+          github-token: ${{github.token}}
+
+  deploy:
+    if: github.ref == 'refs/heads/master'
+
+    needs: [terraform_plan, test_ruby]
+
+    strategy:
+      max-parallel: 1
+
+      matrix:
+        tf_workspace: [staging, production, global]
+        include:
+          - tf_workspace: staging
+            tf_dir: terraform/app_environment
+          - tf_workspace: production
+            tf_dir: terraform/app_environment
+          - tf_workspace: global
+            tf_dir: terraform/app_global
+
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
+      DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+      DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_EMAIL: ${{ secrets.HEROKU_EMAIL }}
+      TF_WORKSPACE: ${{ matrix.tf_workspace }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: 'Terraform Init'
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: ${{ env.TF_VERSION }}
+          tf_actions_subcommand: 'init'
+          tf_actions_working_dir: ${{ matrix.tf_dir }}
+
+      - name: 'Terraform Apply'
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: ${{ env.TF_VERSION }}
+          tf_actions_subcommand: 'apply'
+          tf_actions_working_dir: ${{ matrix.tf_dir }}
+
+      - run: ./bin/git_changes

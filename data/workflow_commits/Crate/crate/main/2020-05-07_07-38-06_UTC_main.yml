@@ -1,0 +1,22 @@
+---
+name: CrateDB SQL
+on: [push]
+
+jobs:
+  test:
+    name: Test CrateDB SQL on ${{ matrix.os }} with Java ${{ matrix.bundled-jdk }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        bundled-jdk: [14.0.1+7]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Gradle Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Run tests on ${{ matrix.os }}
+        uses: eskatos/gradle-command-action@v1
+        with:
+          arguments: :server:test -Dbundled_jdk_version=${{ matrix.bundled-jdk }}

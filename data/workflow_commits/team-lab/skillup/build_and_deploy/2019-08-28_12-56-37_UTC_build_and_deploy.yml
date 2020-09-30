@@ -1,0 +1,51 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node (12.x)
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+    - name: Install
+      run: npm install
+    - name: Build
+      run: npm run build
+    - name: Deploy
+      run: |
+        echo "============================"
+        echo "============================"
+        git --version
+        git remote -v
+        git config --list
+        echo "============================"
+        echo "============================"
+        git config --global user.email "ikedanatsuko@team-lab.com"
+        git config --global user.name "ikedanatsuko"
+        git config --list
+        echo "============================"
+        echo "============================"
+        mkdir $HOME/.ssh
+        chmod 755 $HOME/.ssh
+        ls -al ~
+        echo "============================"
+        echo "============================"
+        echo ${DEPLOY_KEY} > $HOME/.ssh/deploy_key
+        chmod 755 $HOME/.ssh/deploy_key
+        echo "HOST github.com\n  User git\n  IdentityFile $HOME/.ssh/deploy_key" > $HOME/.ssh/config
+        chmod 644 $HOME/.ssh/config
+        ls -al ~/.ssh
+        echo "============================"
+        echo "============================"
+        ssh git@github.com
+        npm run deploy
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}

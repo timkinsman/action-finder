@@ -1,0 +1,40 @@
+name: trigger sync configs
+
+on:
+  push:
+    paths:
+      - .github/workflows/trigger_sync_configs.yml
+      - Gemfile
+      - shared/**
+      - templates/**
+      - workflows/**
+      - projects
+    branches:
+      - master
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set up Ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: "2.6.x"
+      - name: Install dependencies
+        run: gem install ossy --no-document
+      - name: Trigger config synchronization in dry-rb repositories
+        env:
+          GITHUB_LOGIN: dry-bot
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -e $(git log -n 1 --format=%B | grep -q '\[testing\]') ]; then
+            echo "Syncing testing repo"
+            ossy gh w dry-rb/testing sync_configs
+          else
+            for name in `cat projects`
+            do
+              echo "Syncing $name"
+              ossy gh w dry-rb/$name sync_configs
+            done
+          fi

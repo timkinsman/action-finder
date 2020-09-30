@@ -1,0 +1,36 @@
+name: Automerge
+
+on:
+  push:
+    branches:
+      - debug-automerge
+    paths:
+      - .github/actions/automerge/**
+  schedule:
+    - cron: '*/30 * * * *'
+  check_run:
+    types:
+      - completed
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  pull_request_review:
+    types:
+      - submitted
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number
+        required: false
+
+jobs:
+  automerge:
+    if: startsWith(github.repository, 'Homebrew/') && (github.event.review.state == 'approved' || !github.event.review)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: ./.github/actions/automerge
+        with:
+          token: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}

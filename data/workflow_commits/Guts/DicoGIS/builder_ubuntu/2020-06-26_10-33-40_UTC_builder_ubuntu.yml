@@ -1,0 +1,30 @@
+name: Ubuntu Builder
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build-ubuntu:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Get source code
+      uses: actions/checkout@v2
+      with:
+        lfs: true
+
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+
+    - name: Install GDAL
+      run: |
+        sudo add-apt-repository ppa:ubuntugis/ubuntugis-unstable && sudo apt-get update
+        sudo apt-get install gdal-bin
+        sudo apt-get install libgdal-dev
+        export CPLUS_INCLUDE_PATH=/usr/include/gdal
+        export C_INCLUDE_PATH=/usr/include/gdal
+        gdal-config --version

@@ -1,0 +1,36 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+
+  pmd:
+    name: PMD
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run PMD
+      run: ./gradlew pmd
+
+  lint:
+    name: Android Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run Android Lint
+      run: ./gradlew lint
+
+
+  build:
+    name: Release build
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run release build
+      run: ./gradlew packageRelease

@@ -1,0 +1,21 @@
+name: Static code analysis
+
+on: [push]
+
+jobs:
+  static-code-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: phpmd
+        uses: docker://jakzal/phpqa:php7.1-alpine
+        with:
+          args: phpmd src text codesize,unusedcode,naming
+      - name: php_code_sniffer
+        uses: docker://jakzal/phpqa:php7.1-alpine
+        with:
+          args: phpcs --standard=PSR2 src
+      - name: phploc
+        uses: docker://jakzal/phpqa:php7.1-alpine
+        with:
+          args: phploc src

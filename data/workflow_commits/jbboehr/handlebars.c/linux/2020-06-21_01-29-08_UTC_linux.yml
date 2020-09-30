@@ -1,0 +1,62 @@
+name: linux
+
+on:
+  push:
+    branches:
+    - master
+    - dev-1.x
+    - github-actions
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  build_linux_autotools_default_args:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout submodules
+      uses: textbook/git-checkout-submodule-action@master
+    - name: Install packages
+      run: sudo apt-get install -y autotools-dev autoconf automake bats libtool m4 make pkg-config check libpcre3-dev libtalloc-dev libsubunit-dev lcov libjson-c-dev liblmdb-dev libyaml-dev
+    - name: create configure
+      run: autoreconf -i
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    - name: make check
+      run: make check
+    - name: make distcheck
+      run: make distcheck
+    - name: dump logs
+      if: ${{ failure() }}
+      run: |
+        for i in `find tests -name "*.log" 2>/dev/null`; do
+            echo "-- START ${i}";
+            cat "${i}";
+            echo "-- END";
+        done
+
+  build_linux_scanbuild:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout submodules
+      uses: textbook/git-checkout-submodule-action@master
+    - name: Install packages
+      run: sudo apt-get install -y autotools-dev autoconf automake bats libtool m4 make pkg-config check libpcre3-dev libtalloc-dev libsubunit-dev lcov libjson-c-dev liblmdb-dev libyaml-dev clang-tools html2text
+    - name: create configure
+      run: autoreconf -i
+    - name: configure
+      run: scan-build ./configure
+    - name: make
+      run: scan-build -o scan-build make
+    - name: check for issues
+      run: |
+        if [ -n "$(find scan-build -name '*.html')" ]; then
+          echo "scan-build found potential issues"
+          find scan-build -name 'index.html' -print -exec html2text \{} \;
+          find scan-build -name '*.html' -not -name 'index.html' -print -exec html2text \{} \;
+          exit 1
+        fi

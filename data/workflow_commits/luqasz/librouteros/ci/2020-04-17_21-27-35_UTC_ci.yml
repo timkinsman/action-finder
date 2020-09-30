@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CI: yes
+    strategy:
+      matrix:
+        python-version:
+          - 3.6
+          - 3.7
+          - 3.8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Update apt
+        run: sudo apt update
+
+      - name: Install qemu
+        run: >
+          sudo apt-get install -yq --no-install-recommends
+          qemu-system-i386
+          qemu-utils
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install package
+        run: pipenv --python python3 install
+
+      - name: Lint
+        run: pipenv run pylint librouteros
+
+      - name: Type check
+        run: pipenv run mypy librouteros
+
+      - name: Format
+        run: >
+          pipenv run yapf -dr
+          librouteros
+          tests
+
+      - name: Download routeros images
+        run: |
+          wget --quiet netng.pl/routeros_test_images/routeros_6.33.3.qcow2 -O images/routeros_6.33.3.qcow2
+          wget --quiet netng.pl/routeros_test_images/routeros_6.44.5.qcow2 -O images/routeros_6.44.5.qcow2
+
+      - name: Unit tests
+        run: pipenv run pytest tests/unit
+
+      - name: Integration tests
+        run: pipenv run pytest -n auto tests/integration
+
+      - name: Package
+        run: python setup.py sdist
+        if: success()
+
+      - name: Publish package
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && matrix.python-version == '3.7' && success()
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.pypi_password }}

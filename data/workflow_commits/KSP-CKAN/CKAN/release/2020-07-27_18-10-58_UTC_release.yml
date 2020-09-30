@@ -1,0 +1,118 @@
+name: Create Release Assets
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    container:
+      image: mono:5.20
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Installing build dependencies
+        run: apt-get update && apt-get install -y git make sed libplist-utils xorriso gzip fakeroot lintian rpm wget jq
+      - name: Installing runtime dependencies
+        run: apt-get install -y xvfb
+      - name: Restore cache for _build/tools
+        uses: actions/cache@v1
+        with:
+          path: _build/tools
+          key: build-tools-${{ hashfiles('build', 'build.ps1', 'build.cake') }}
+      - name: Restore cache for _build/cake
+        uses: actions/cache@v1
+        with:
+          path: _build/cake
+          key: build-cake-${{ hashfiles('build.cake') }}
+      - name: Restore cache for _build/lib/nuget
+        uses: actions/cache@v1
+        with:
+          path: _build/lib/nuget
+          key: nuget-oldref-modules-${{ hashFiles('**/packages.config') }}-${{ hashFiles('**/*.csproj') }}
+      - name: Restore cache for ~/.nuget/packages
+        uses: actions/cache@v1
+        with:
+          path: ~/.nuget/packages
+          key: nuget-packref-modules-${{ hashFiles('**/packages.config') }}-${{ hashFiles('**/*.csproj') }}
+
+      - name: Build ckan.exe and netkan.exe
+        run: ./build --configuration=Release
+      - name: Run tests
+        run: xvfb-run ./build test+only --configuration=Release --where="Category!=FlakyNetwork"
+
+      - name: Build dmg
+        run: ./build osx --configuration=Release --exclusive
+      - name: Build deb
+        run: ./build deb --configuration=Release --exclusive
+      - name: Build rpm
+        run: ./build rpm --configuration=Release --exclusive
+
+      - name: Get release data
+        id: release_data
+        run: |
+          URL=$(wget -qO- https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq '.[0].upload_url' | tr -d \")
+          echo "::set-output name=upload_url::$URL"
+          VERSION=$(wget -qO- https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq '.[0].tag_name' | tr -d \"v)
+          echo "::set-output name=version::$VERSION"
+          RPM_VERSION=$(echo $VERSION | sed -e 's/-/_/g')
+          echo "::set-output name=rpm_version::$RPM_VERSION"
+      - name: Upload ckan.exe
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release_data.outputs.upload_url }}
+          asset_path: _build/repack/Release/ckan.exe
+          asset_name: ckan.exe
+          asset_content_type: application/vnd.microsoft.portable-executable
+      - name: Upload CKAN.dmg
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release_data.outputs.upload_url }}
+          asset_path: _build/osx/CKAN.dmg
+          asset_name: CKAN.dmg
+          asset_content_type: application/x-apple-diskimage
+      - name: Upload ckan_*.deb
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release_data.outputs.upload_url }}
+          asset_path: _build/deb/ckan_${{ steps.release_data.outputs.version }}_all.deb
+          asset_name: ckan_${{ steps.release_data.outputs.version }}_all.deb
+          asset_content_type: application/vnd.debian.binary-package
+      - name: Upload ckan-*.rpm
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release_data.outputs.upload_url }}
+          asset_path: _build/rpm/RPMS/noarch/ckan-${{ steps.release_data.outputs.rpm_version }}-1.noarch.rpm
+          asset_name: ckan-${{ steps.release_data.outputs.rpm_version }}-1.noarch.rpm
+          asset_content_type: application/x-rpm
+      - name: Upload AutoUpdater.exe
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release_data.outputs.upload_url }}
+          asset_path: _build/out/AutoUpdater/Release/bin/AutoUpdater.exe
+          asset_name: AutoUpdater.exe
+          asset_content_type: application/vnd.microsoft.portable-executable
+
+      - name: Send Discord Notification
+        env:
+          JOB_STATUS: ${{ job.status }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
+          HOOK_OS_NAME: ${{ runner.os }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+        if: ${{ always() && env.WEBHOOK_URL }}]
+        run: |
+          git clone --depth 1 https://github.com/DiscordHooks/github-actions-discord-webhook.git webhook
+          bash webhook/send.sh $JOB_STATUS $WEBHOOK_URL

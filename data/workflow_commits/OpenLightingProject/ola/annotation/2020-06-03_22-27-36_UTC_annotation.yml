@@ -1,0 +1,15 @@
+# GitHub Action to annotate some of our test tool results
+name: annotation
+on: [push, pull_request]
+jobs:
+  flake8-annotation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Flake8 with annotations
+        # if you update the flake8 options, please also update README.developer and .travis-ci.sh to match
+        uses: TrueBrain/actions-flake8@master
+        with:
+          ignore: E111,E114,E121,E127,E129,W504
+          max_line_length: 80
+          exclude: "*_pb2.py,.git,__pycache"

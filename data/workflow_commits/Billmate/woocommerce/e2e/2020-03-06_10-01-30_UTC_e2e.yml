@@ -1,0 +1,20 @@
+name: E2E tests
+
+on: [push]
+
+jobs:
+  e2e-test-job:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Build the docker-compose stack
+        run: docker-compose -f docker-compose.yml up -d
+
+      - name: Check running Docker containers
+        run: docker ps -a
+
+      - name: Ping Docker network localhost:8282
+        run: ping localhost -p 8282 -c 4

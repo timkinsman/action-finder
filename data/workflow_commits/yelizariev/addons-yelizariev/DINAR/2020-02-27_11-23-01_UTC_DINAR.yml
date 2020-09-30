@@ -1,0 +1,83 @@
+# Copyright 2020 IT-Projects Labs
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: "DINAR: Docker Image Building"
+
+on:
+  push:
+    paths:
+      - ".DINAR/**"
+      - ".github/workflows/DINAR.yml"
+
+  schedule:
+    - cron: "5 5 * * 0"
+
+jobs:
+  rebuild-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+        with:
+          path: REPO
+      - name: Checkout DINAR
+        uses: actions/checkout@v2
+        with:
+          path: DINAR
+          # TMP
+          #repository: itpp-labs/DINAR
+          #ref: master
+          repository: yelizariev/itpp-runbot
+          ref: tests
+      - uses: actions/setup-python@v1
+        with:
+          python-version: "3.7.x"
+      - name: Prepare build folder
+        run: |
+          cp -rnT DINAR/embedded-files/ REPO/
+
+      - name: Configure Docker
+        run: |
+          bash DINAR/workflow-files/configure-docker.sh ${{ secrets.DINAR_TOKEN }}
+          echo "::set-env name=IMAGE_ODOO_BASE::${GITHUB_REPOSITORY}/dinar-deps-$IMAGE_CODE"
+          echo "::set-env name=REGISTRY_IMAGE_DB::itpp/postgres-autoconf:${DB_VERSION}-alpine"
+
+      - name: dinar-deps
+        uses: elgohr/Publish-Docker-Github-Action@master
+        env:
+          LOCAL_CUSTOM_DIR: ./image
+          AGGREGATE: true
+          PIP_INSTALL_ODOO: false
+          CLEAN: false
+          COMPILE: false
+        with:
+          name: ${{ env.IMAGE_DEPS }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+          buildargs: ODOO_VERSION,AGGREGATE,PIP_INSTALL_ODOO,CLEAN,COMPILE,LOCAL_CUSTOM_DIR
+          workdir: REPO/.DINAR/
+          cache: ${{ github.event_name != 'schedule' }}
+      - name: Install shyaml
+        run: |
+          pip install shyaml
+      - name: Install Base Addons
+        run: |
+          # convert "base-addons" list to comma-separated list
+          export MODULES=$(cat REPO/.DINAR/volumes/addons.yaml | shyaml get-values base-addons | xargs | sed "s/ /,/g")
+
+          export DOODBA_WITHOUT_DEMO=all
+          bash DINAR/workflow-files/images-with-preinstalled-modules.sh $IMAGE_DB-nodemo $IMAGE_ODOO-nodemo
+
+          export DOODBA_WITHOUT_DEMO=false
+          bash DINAR/workflow-files/images-with-preinstalled-modules.sh $IMAGE_DB $IMAGE_ODOO

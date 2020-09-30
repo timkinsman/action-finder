@@ -1,0 +1,27 @@
+# Run unit tests through CTest
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run cmake
+      run: |
+        mkdir build
+        cd build
+        cmake --config Release ..
+    - name: Build and run tests
+      run: |
+        cd build
+        make
+        ctest --output-on-failure
+# Can't seem to pass extra info to "make test", thus use ctest directly
+# Use "ctest --debug --extra-verbose" to get full debug output

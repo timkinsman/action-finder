@@ -1,0 +1,35 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [12]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+    - name: Install
+      run: npm install
+    - name: Build
+      run: npm run build
+    - name: Deploy
+      run: npm run deploy
+      # uses: team-lab/npm-github-actions@master
+      # with:
+      #   args: run deploy
+      env:
+        GIT_USER_EMAIL: "ikedanatsuko@team-lab.com"
+        GIT_USER_NAME: "ikedanatsuko"
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

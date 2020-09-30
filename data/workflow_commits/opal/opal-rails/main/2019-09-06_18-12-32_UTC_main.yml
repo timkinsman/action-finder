@@ -1,0 +1,31 @@
+name: CI
+on: [push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        ruby: ['2.5.x', '2.6.x']
+        rails: ['rails_5_1', 'rails_5_2', 'rails_6_0']
+        opal: ['opal_1_0', 'opal_master']
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install libraries
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y sqlite3 libsqlite3-dev
+    - uses: actions/checkout@v1
+    - name: Set up Ruby
+      uses: actions/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Install Dependencies
+      run: |
+        export BUNDLE_GEMFILE="gemfiles/${{ matrix.rails }}_${{ matrix.opal }}.gemfile"
+        gem install bundler
+        bundle install --jobs 4 --retry 3
+    - name: Test with Rake
+      run: |
+        export BUNDLE_GEMFILE="gemfiles/${{ matrix.rails }}_${{ matrix.opal }}.gemfile"
+        bundle exec rake

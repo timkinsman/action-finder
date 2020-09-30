@@ -1,0 +1,35 @@
+name: macOS
+on: [push]
+jobs:
+  build:
+    strategy:
+      matrix:
+        ruby: [2.4, 2.5, 2.6, 2.7]
+    runs-on: macos-latest
+    name: RSpec
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Ruby ${{ matrix.ruby }}
+      uses: eregon/use-ruby-action@master
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Install Dependencies
+      run: |
+        brew update
+        brew cask install google-chrome chromedriver
+    - uses: actions/cache@v1
+      with:
+        path: vendor/bundle
+        key: ${{ runner.os }}-${{ matrix.ruby }}-bundler-${{ hashFiles('**/Gemfile.lock')}}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.ruby }}-bundler-
+    - name: bundle install
+      run: |
+        gem install bundler
+        bundle install --jobs 4 --retry 3 --path vendor/bundle
+    - name: Run RSpec
+      # FIXME:
+      # macOS CI error: raise Error::WebDriverError, cannot_connect_error_text
+      # Selenium::WebDriver::Error::WebDriverError:
+      #   unable to connect to chromedriver 127.0.0.1:9515
+      run: bundle exec rspec --tag ~js:true

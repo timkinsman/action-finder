@@ -1,0 +1,48 @@
+name: GitHub Actions CI
+on:
+  push:
+    branches: master
+  pull_request: []
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+
+    steps:
+    - name: Set up Homebrew
+      id: set-up-homebrew
+      uses: Homebrew/actions/setup-homebrew@master
+
+    - name: Cache Homebrew Bundler RubyGems
+      id: cache
+      uses: actions/cache@main
+      with:
+        path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+        key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+        restore-keys: ${{ runner.os }}-rubygems-
+
+    - name: Install Homebrew Bundler RubyGems
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: brew install-bundler-gems
+
+    - name: Run brew test-bot --only-tap-syntax
+      run: brew test-bot --only-tap-syntax
+
+    - name: Set up Ruby
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/setup-ruby@master
+      with:
+        ruby-version: '2.6'
+
+    - name: Install Bundler
+      run: gem install bundler -v "~>1"
+
+    - name: Install Homebrew/homebrew-bundle RubyGems
+      run: bundle install --jobs 4 --retry 3
+
+    - name: Run RSpec tests
+      run: bundle exec rspec
+      env:
+        CODECOV_TOKEN: d8abdd06-9193-47d3-9da9-b4b25064e49b

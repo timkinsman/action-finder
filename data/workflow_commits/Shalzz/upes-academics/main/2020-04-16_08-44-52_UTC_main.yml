@@ -1,0 +1,61 @@
+name: Android CI
+
+# Trigger the workflow on push or pull request
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+    - run: git fetch --prune --unshallow
+
+    - name: Set up JDK 11.x
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11.x
+
+    - name: Install required Android tools
+      run: |
+        echo "y" | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install "ndk-bundle" > /dev/null
+        echo "y" | sudo $ANDROID_HOME/tools/bin/sdkmanager --licenses > /dev/null
+
+    - name: Download Dependencies
+      run: ./gradlew androidDependencies
+
+    - name: Check Dependency Versions
+      run: ./gradlew :app:dependencies
+
+    - name: Run Unit Tests
+      run: ./gradlew test
+
+    - name: Build & Test Project
+      run: ./gradlew assemble --continue --stacktrace
+      env:
+        APP_KEY: ${{ secrets.APP_KEY }}
+
+    - name: Run Lint checks
+      run: ./gradlew lint --continue
+
+  test:
+    runs-on: macos-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+    - run: git fetch --prune --unshallow
+
+    - name: Run Instrumentation tests
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 29
+        script: ./gradlew connectedCheck --stacktrace
+
+  deploy:
+    needs: [build, test]
+    if: contains(github.ref, 'tags')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Publish
+      run: ./gradlew publishRelease --stacktrace
