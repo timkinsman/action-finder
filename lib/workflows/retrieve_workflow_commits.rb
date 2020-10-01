@@ -9,7 +9,7 @@ require 'tty-spinner'
 require_relative 'util/authenticate'
 require_relative 'util/check_rate_limit'
 
-def retrieve_commit_history(user, pass, input, output)
+def retrieve_commit_history(user, pass, input, dir)
     client = authenticate(user, pass)
 
     CSV.foreach(input, headers: true) do |row|
@@ -22,7 +22,7 @@ def retrieve_commit_history(user, pass, input, output)
             check_rate_limit(client, commits.count, spinner)
 
             commits.reverse_each do |commit|
-                dest = "#{output}/#{row[0]}/#{wf.rpartition('.')[0]}"
+                dest = "#{dir}/#{row[0]}/#{wf.rpartition('.')[0]}"
                 date = "#{commit.commit.author.date.to_s.gsub(" ", "_").gsub(":", "-")}_#{wf}"
                 begin
                     file = client.contents(row[0], path: ".github/workflows/#{wf}", ref: commit.sha)

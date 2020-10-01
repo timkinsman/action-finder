@@ -3,26 +3,26 @@
 require 'csv'
 require 'tty-spinner'
 
-def find_actions(dir, output)
+def find_actions(output, dir)
   spinner = TTY::Spinner.new('[:spinner] Finding actions ...', format: :classic)
   spinner.auto_spin
 
   commented_out = 0  
   CSV.open(output, 'w') do |csv|
     csv << ["repository", "workflow_files", "workflow_files_count", "actions", "actions_count"]
-    Dir.foreach("#{dir}/workflows") do |user|
+    Dir.foreach(dir) do |user|
       next if user == '.' || user == '..'
 
-      Dir.foreach("#{dir}/workflows/#{user}") do |repo|
+      Dir.foreach("#{dir}/#{user}") do |repo|
         next if repo == '.' || repo == '..'
         row, workflows, actions, num_actions = [], [], [], []
         row[0] = "#{user}/#{repo}"
 
-        Dir.foreach("#{dir}/workflows/#{user}/#{repo}") do |workflow|
+        Dir.foreach("#{dir}/#{user}/#{repo}") do |workflow|
           next if workflow == '.' or workflow == '..'
           workflows << workflow
 
-          Dir.glob("#{dir}/workflows/#{user}/#{repo}/#{workflow}") do |file|
+          Dir.glob("#{dir}/#{user}/#{repo}/#{workflow}") do |file|
             action = []
             File.open(file) do |contents|
               contents.each_line do |line|

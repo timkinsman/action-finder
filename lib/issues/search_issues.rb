@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'octokit'
 require 'csv'
 require 'json'
@@ -16,13 +18,13 @@ def find_issues(user, pass, input, file)
             CSV.foreach(file, headers: true) do |repo|
                 next unless JSON.parse(repo[3]).any? { |a| a.include?(action) }
                 repo = repo[0]
-                spinner = TTY::Spinner.new("[:spinner] Checking if #{repo} has issues involving #{action} ...", format: :classic)
+                spinner = TTY::Spinner.new("[:spinner] Checking if #{repo} has issues involving #{action.split('/')[-1]} ...", format: :classic)
                 spinner.auto_spin
                 client = authenticate(user, pass)
                 check_rate_limit(client, 50, spinner)
                 sleep(2)
                 begin
-                    issue = client.search_issues("\"github action\" OR \"github actions\" OR #{action} repo:#{repo} comments:>0 updated:>=2019-11-13").items # type:issue
+                    issue = client.search_issues("\"github action\" OR \"github actions\" OR #{action.split('/')[0]} OR #{action.split('/')[-1]} repo:#{repo} comments:>0 updated:>=2019-11-13").items # type:issue
 
                     if issue.empty?
                         spinner.error
@@ -45,5 +47,5 @@ def find_issues(user, pass, input, file)
     end
 end
 
-find_issues('timkinsman', '530qgpOV6S3f', 'data/actions_metadata.csv', 'data/actions.csv')
+find_issues(ARGV[0], ARGV[1], 'data/actions_metadata.csv', 'data/actions.csv')
 

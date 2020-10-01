@@ -3,11 +3,11 @@
 require 'csv'
 require 'tty-spinner'
 
-def filter_dataset(dir)
+def filter_dataset(input, output)
   spinner = TTY::Spinner.new('[:spinner] Filtering dataset ...', format: :classic)
   spinner.auto_spin
 
-  CSV.open("#{dir}/dataset_filtered.csv", 'w') do |csv|
+  CSV.open(output, 'w') do |csv|
     csv << [
       "repository",
       "language",
@@ -27,7 +27,7 @@ def filter_dataset(dir)
       "randomforest_utl" # row[15]
     ]
 
-    CSV.foreach("#{dir}/dataset.csv", headers: true) do |row|
+    CSV.foreach(input, headers: true) do |row|
       csv << row if row[13] == '1' || row[15] == '1'
     end
   end
