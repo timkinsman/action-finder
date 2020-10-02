@@ -8,7 +8,7 @@ require 'tty-spinner'
 require_relative 'util/authenticate'
 require_relative 'util/check_rate_limit'
 
-def get_issues(user, pass, file)
+def get_issues(user, pass)
     client = authenticate(user, pass)
 
     CSV.open("data/issues.csv", 'w') do |csv|

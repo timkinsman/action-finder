@@ -54,7 +54,7 @@ def calculate_diff(prev_file, next_file, hash)
     existing_action = false
     possible_version_change = false
 
-    diff_file.each_with_index do |line, index|
+    diff_file.each do |line|
         is_with = true # assume it's a with block
 
         if line[0] =~ /\suses:/
@@ -64,8 +64,10 @@ def calculate_diff(prev_file, next_file, hash)
             if arguments_modified == true
                 if hash[action_split].has_key? 'arugments_modified_n_times'
                     hash[action_split]['arugments_modified_n_times'] = hash[action_split]['arugments_modified_n_times'] + 1
+                    added_actions << action_split
                 else
                     hash[action_split]['arugments_modified_n_times'] = 1
+                    added_actions << action_split
                 end
                 arguments_modified = false
             end
@@ -74,8 +76,10 @@ def calculate_diff(prev_file, next_file, hash)
                 if action.split('@')[0] == line[0].gsub(/\s+/, "")[/(?<=uses:).*/].split('@')[0] && action != line[0].gsub(/\s+/, "")[/(?<=uses:).*/]
                     if hash[action_split].has_key? 'version_changed_n_times'
                         hash[action_split]['version_changed_n_times'] = hash[action_split]['version_changed_n_times'] + 1
+                        added_actions << action_split
                     else
                         hash[action_split]['version_changed_n_times'] = 1
+                        added_actions << action_split
                     end
                     possible_version_change = false
                     next
@@ -94,8 +98,10 @@ def calculate_diff(prev_file, next_file, hash)
                 possible_version_change = true
                 if hash[action_split].has_key? 'removed_n_times'
                     hash[action_split]['removed_n_times'] = hash[action_split]['removed_n_times'] + 1
+                    added_actions << action_split
                 else
                     hash[action_split]['removed_n_times'] = 1
+                    added_actions << action_split
                 end
             elsif line[0].start_with?('+')
                 existing_action = false
@@ -129,13 +135,14 @@ def get_actions
     temp = Tempfile.new
 
     CSV.open('data/has_actions.csv', 'w') do |csv|
-        csv << ['repository', "added_actions"]
+        csv << ['repository', "actions"]
 
         Dir.foreach('data/workflows') do |user|
-            next if user == '.' || user == '..'
+            next if user == '.' or user == '..'
 
             Dir.foreach("data/workflows/#{user}") do |repo|
-                next if repo == '.' || repo == '..'
+                next if repo == '.' or repo == '..'
+                actions = []
 
                 Dir.foreach("data/workflows/#{user}/#{repo}") do |workflows|
                     next if workflows == '.' or workflows == '..'
@@ -145,11 +152,14 @@ def get_actions
                         next if workflow == '.' or workflow == '..'
 
                         Dir.glob("data/workflows/#{user}/#{repo}/#{workflows}/#{workflow}") do |file|
-                            csv << ["#{user}/#{repo}", calculate_diff(prev_file, file, hash)]
+                            actions = actions + calculate_diff(prev_file, file, hash)
                             prev_file = file
                         end
+
                     end
                 end
+
+                csv << ["#{user}/#{repo}", actions.uniq]
             end
         end
     end
