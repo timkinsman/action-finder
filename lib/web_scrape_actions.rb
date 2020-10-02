@@ -4,22 +4,18 @@ require 'csv'
 require 'mechanize'
 require 'tty-spinner'
 
-def get_metadata(repository, agent)
+def get_metadata(action, agent)
     metadata = ["", "", "false"]
 
-    if repository.count('/') < 1 then
+    if action.count('/') < 1 then
         return metadata
     end
 
-    if repository.count('/') > 1 then
-        partition = repository.partition('/')
-        if partition[2].count('/') > 0 then
-            url = "https://github.com/#{partition[0]}/#{partition[2].partition('/')[0]}"
-        else
-            url = "https://github.com/#{partition[0]}/#{partition[2]}"
-        end
+    if action.count('/') > 1 then
+        split = action.split('/')
+        url = "https://github.com/#{split[0]}/#{split[1]}"
     else
-        url = "https://github.com/#{repository}"
+        url = "https://github.com/#{action}"
     end
 
     begin
@@ -42,16 +38,16 @@ def get_metadata(repository, agent)
     metadata
 end
 
-def retrieve_actions_metadata(input, output)
-    spinner = TTY::Spinner.new("[:spinner] Retrieving metadata on actions ...", format: :classic)
+def web_scrape_actions
+    spinner = TTY::Spinner.new("[:spinner] Web scrape actions ...", format: :classic)
     spinner.auto_spin
 
     agent = Mechanize.new
     
-    CSV.open(output, 'w') do |csv|
+    CSV.open('data/actions_final.csv', 'w') do |csv|
         csv << ["action", "categories", "verified", "added_n_times", "removed_n_times", "agrugments_modified_n_times", "version_changed_n_times", "about"]
-        CSV.foreach(input, headers: true) do |row|
-            metadata = get_metadata(repository, agent)
+        CSV.foreach('data/actions.csv', headers: true) do |row|
+            metadata = get_metadata(row[0], agent)
             csv << [row[0], metadata[0], metadata[2], row[1], row[2], row[3], row[4], metadata[1]]
             sleep(1)
         end

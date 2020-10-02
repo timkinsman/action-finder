@@ -49,6 +49,7 @@ def calculate_diff(prev_file, next_file, hash)
     version_changed_n_times = []
 
     action = ""
+    added_actions = []
     arguments_modified = false
     existing_action = false
     possible_version_change = false
@@ -57,8 +58,8 @@ def calculate_diff(prev_file, next_file, hash)
         is_with = true # assume it's a with block
 
         if line[0] =~ /\suses:/
-            is_with = false 
-            action_split = action.split('@')[0].gsub('"', '')
+            is_with = false
+            action_split = action.split('@')[0].gsub('"', '') unless action.empty?
 
             if arguments_modified == true
                 if hash[action_split].has_key? 'arugments_modified_n_times'
@@ -101,8 +102,10 @@ def calculate_diff(prev_file, next_file, hash)
                 possible_version_change = false
                 if hash[action_split].has_key? 'added_n_times'
                     hash[action_split]['added_n_times'] = hash[action_split]['added_n_times'] + 1
+                    added_actions << action_split
                 else
                     hash[action_split]['added_n_times'] = 1
+                    added_actions << action_split
                 end
             else
                 existing_action = true
@@ -114,43 +117,57 @@ def calculate_diff(prev_file, next_file, hash)
             arguments_modified = true
         end
     end
+
+    added_actions.uniq
 end
 
-def filter_workflow_commits(output, dir)
-    spinner = TTY::Spinner.new("[:spinner] Retrieving metadata on commit history ...", format: :classic)
+def get_actions
+    spinner = TTY::Spinner.new("[:spinner] Get actions ...", format: :classic)
     spinner.auto_spin
 
     hash = Hash.new{ |h, k| h[k] = Hash.new(&h.default_proc) }
     temp = Tempfile.new
 
-    Dir.foreach(dir) do |user|
-        next if user == '.' || user == '..'
+    CSV.open('data/has_actions.csv', 'w') do |csv|
+        csv << ['repository', "added_actions"]
 
-        Dir.foreach("#{dir}/#{user}") do |repo|
-            next if repo == '.' || repo == '..'
+        Dir.foreach('data/workflows') do |user|
+            next if user == '.' || user == '..'
 
-            Dir.foreach("#{dir}/#{user}/#{repo}") do |workflow|
-                next if workflow == '.' or workflow == '..'
-                prev_file = temp.path
+            Dir.foreach("data/workflows/#{user}") do |repo|
+                next if repo == '.' || repo == '..'
 
-                Dir.foreach("#{dir}/#{user}/#{repo}/#{workflow}") do |history|
-                    next if history == '.' or history == '..'
+                Dir.foreach("data/workflows/#{user}/#{repo}") do |workflows|
+                    next if workflows == '.' or workflows == '..'
+                    prev_file = temp.path
 
-                    Dir.glob("#{dir}/#{user}/#{repo}/#{workflow}/#{history}") do |file|
-                        calculate_diff(prev_file, file, hash)
-                        prev_file = file
+                    Dir.foreach("data/workflows/#{user}/#{repo}/#{workflows}") do |workflow|
+                        next if workflow == '.' or workflow == '..'
+
+                        Dir.glob("data/workflows/#{user}/#{repo}/#{workflows}/#{workflow}") do |file|
+                            csv << ["#{user}/#{repo}", calculate_diff(prev_file, file, hash)]
+                            prev_file = file
+                        end
                     end
                 end
             end
         end
     end
 
-    spinner.success
+    hash.each do |h|
+        h[1]['added_n_times'] = 0 if h[1]['added_n_times'] == {}
+        h[1]['removed_n_times'] = 0 if h[1]['removed_n_times'] == {}
+        h[1]['arugments_modified_n_times'] = 0 if h[1]['arugments_modified_n_times'] == {}
+        h[1]['version_changed_n_times'] = 0 if h[1]['version_changed_n_times'] == {}
+    end
 
-    CSV.open(output, 'w') do |csv|
+
+    CSV.open('data/actions.csv', 'w') do |csv|
         csv << ['action', 'added_n_times', 'removed_n_times', 'arugments_modified_n_times', 'version_changed_n_times']
         hash.each do |h|
             csv << [h[0], h[1]['added_n_times'], h[1]['removed_n_times'], h[1]['arugments_modified_n_times'], h[1]['version_changed_n_times']]
         end
     end
+
+    spinner.success
 end
