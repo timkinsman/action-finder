@@ -5,18 +5,15 @@ require 'diffy'
 require 'tempfile'
 require 'tty-spinner'
 
-temp = Tempfile.new
-hash = Hash.new{ |h,k| h[k] = Hash.new(&h.default_proc) }
-
-def get_diff(file1, file2, dup, hash)
+def get_diff(prev_file, next_file)
     with_block = false
     with_space = 0
 
     discard_action = false
 
-    tmp_file = []
+    diff_file = []
 
-    Diffy::Diff.new(file1, file2, source: 'files').each do |line|
+    Diffy::Diff.new(prev_file, next_file, source: 'files').each do |line|
         with_block = false if line[1..-1][/\A */].size != with_space + 2 
 
         if line.split('#')[0] =~ /\suses:/
@@ -26,7 +23,7 @@ def get_diff(file1, file2, dup, hash)
             end
             discard_action = false
 
-            tmp_file << [line]
+            diff_file << [line]
         end
 
         if line =~ /\swith:/ && discard_action == false
@@ -35,42 +32,49 @@ def get_diff(file1, file2, dup, hash)
         end
 
         if with_block == true
-            tmp_file << [line]
+            diff_file << [line]
         end
     end
 
-    ###
+    diff_file
+end
 
-    added = []
-    removed = []
-    modified_args = []
-    version_change = []
+
+def calculate_diff(prev_file, next_file, hash)
+    diff_file = get_diff(prev_file, next_file)
+
+    added_n_times = []
+    removed_n_times = []
+    arugments_modified_n_times = []
+    version_changed_n_times = []
 
     action = ""
-    args_modified = false
+    arguments_modified = false
     existing_action = false
     possible_version_change = false
 
-    tmp_file.each_with_index do |line, index|
-        is_with = true
+    diff_file.each_with_index do |line, index|
+        is_with = true # assume it's a with block
 
         if line[0] =~ /\suses:/
             is_with = false 
-            if args_modified == true
-                if hash[action.split('@')[0].gsub('"', '')].has_key? 'modified_args'
-                    hash[action.split('@')[0].gsub('"', '')]['modified_args'] = hash[action.split('@')[0].gsub('"', '')]['modified_args'] + 1
+            action_split = action.split('@')[0].gsub('"', '')
+
+            if arguments_modified == true
+                if hash[action_split].has_key? 'arugments_modified_n_times'
+                    hash[action_split]['arugments_modified_n_times'] = hash[action_split]['arugments_modified_n_times'] + 1
                 else
-                    hash[action.split('@')[0].gsub('"', '')]['modified_args'] = 1
+                    hash[action_split]['arugments_modified_n_times'] = 1
                 end
-                args_modified = false
+                arguments_modified = false
             end
 
             if possible_version_change && line[0].start_with?('+')
                 if action.split('@')[0] == line[0].gsub(/\s+/, "")[/(?<=uses:).*/].split('@')[0] && action != line[0].gsub(/\s+/, "")[/(?<=uses:).*/]
-                    if hash[action.split('@')[0].gsub('"', '')].has_key? 'version_changes'
-                        hash[action.split('@')[0].gsub('"', '')]['version_changes'] = hash[action.split('@')[0].gsub('"', '')]['version_changes'] + 1
+                    if hash[action_split].has_key? 'version_changed_n_times'
+                        hash[action_split]['version_changed_n_times'] = hash[action_split]['version_changed_n_times'] + 1
                     else
-                        hash[action.split('@')[0].gsub('"', '')]['version_changes'] = 1
+                        hash[action_split]['version_changed_n_times'] = 1
                     end
                     possible_version_change = false
                     next
@@ -82,21 +86,23 @@ def get_diff(file1, file2, dup, hash)
             next if action.nil? or action.empty?
             next if action.include?('.')
 
+            action_split = action.split('@')[0].gsub('"', '')
+
             if line[0].start_with?('-')
                 existing_action = false
                 possible_version_change = true
-                if hash[action.split('@')[0].gsub('"', '')].has_key? 'removed'
-                    hash[action.split('@')[0].gsub('"', '')]['removed'] = hash[action.split('@')[0].gsub('"', '')]['removed'] + 1
+                if hash[action_split].has_key? 'removed_n_times'
+                    hash[action_split]['removed_n_times'] = hash[action_split]['removed_n_times'] + 1
                 else
-                    hash[action.split('@')[0].gsub('"', '')]['removed'] = 1
+                    hash[action_split]['removed_n_times'] = 1
                 end
             elsif line[0].start_with?('+')
                 existing_action = false
                 possible_version_change = false
-                if hash[action.split('@')[0].gsub('"', '')].has_key? 'added'
-                    hash[action.split('@')[0].gsub('"', '')]['added'] = hash[action.split('@')[0].gsub('"', '')]['added'] + 1
+                if hash[action_split].has_key? 'added_n_times'
+                    hash[action_split]['added_n_times'] = hash[action_split]['added_n_times'] + 1
                 else
-                    hash[action.split('@')[0].gsub('"', '')]['added'] = 1
+                    hash[action_split]['added_n_times'] = 1
                 end
             else
                 existing_action = true
@@ -105,7 +111,7 @@ def get_diff(file1, file2, dup, hash)
         end
 
         if existing_action && is_with && (line[0].start_with?('-') || line[0].start_with?('+'))
-            args_modified = true
+            arguments_modified = true
         end
     end
 end
@@ -114,21 +120,24 @@ def filter_workflow_commits(output, dir)
     spinner = TTY::Spinner.new("[:spinner] Retrieving metadata on commit history ...", format: :classic)
     spinner.auto_spin
 
-    Dir.foreach("#{dir}/workflow_commits") do |user|
+    hash = Hash.new{ |h, k| h[k] = Hash.new(&h.default_proc) }
+    temp = Tempfile.new
+
+    Dir.foreach(dir) do |user|
         next if user == '.' || user == '..'
 
-        Dir.foreach("#{dir}/workflow_commits/#{user}") do |repo|
+        Dir.foreach("#{dir}/#{user}") do |repo|
             next if repo == '.' || repo == '..'
 
-            Dir.foreach("#{dir}/workflow_commits/#{user}/#{repo}") do |workflow|
+            Dir.foreach("#{dir}/#{user}/#{repo}") do |workflow|
                 next if workflow == '.' or workflow == '..'
                 prev_file = temp.path
 
-                Dir.foreach("#{dir}/workflow_commits/#{user}/#{repo}/#{workflow}") do |history|
+                Dir.foreach("#{dir}/#{user}/#{repo}/#{workflow}") do |history|
                     next if history == '.' or history == '..'
 
-                    Dir.glob("#{dir}/workflow_commits/#{user}/#{repo}/#{workflow}/#{history}") do |file|
-                        get_diff(prev_file, file, true, hash)
+                    Dir.glob("#{dir}/#{user}/#{repo}/#{workflow}/#{history}") do |file|
+                        calculate_diff(prev_file, file, hash)
                         prev_file = file
                     end
                 end
@@ -139,9 +148,9 @@ def filter_workflow_commits(output, dir)
     spinner.success
 
     CSV.open(output, 'w') do |csv|
-        csv << ['action', 'added', 'removed', 'modified_args', 'version_changes']
+        csv << ['action', 'added_n_times', 'removed_n_times', 'arugments_modified_n_times', 'version_changed_n_times']
         hash.each do |h|
-            csv << [h[0], h[1]['added'], h[1]['removed'], h[1]['modified_args'], h[1]['version_changes']]
+            csv << [h[0], h[1]['added_n_times'], h[1]['removed_n_times'], h[1]['arugments_modified_n_times'], h[1]['version_changed_n_times']]
         end
     end
 end

@@ -49,11 +49,10 @@ def retrieve_actions_metadata(input, output)
     agent = Mechanize.new
     
     CSV.open(output, 'w') do |csv|
-        csv << ["action", "categories", "about", "verified", "added_n_times", "removed_n_times", "agrugments_modified_n_times", "version_changed_n_times"]
+        csv << ["action", "categories", "verified", "added_n_times", "removed_n_times", "agrugments_modified_n_times", "version_changed_n_times", "about"]
         CSV.foreach(input, headers: true) do |row|
-            #repository = row[0].gsub("docker://", "")
             metadata = get_metadata(repository, agent)
-            csv << [row[0], metadata[0], metadata[1], metadata[2], row[1], row[2], row[3], row[4]]
+            csv << [row[0], metadata[0], metadata[2], row[1], row[2], row[3], row[4], metadata[1]]
             sleep(1)
         end
     end

@@ -9,7 +9,7 @@ def check_rate_limit(client, x, spinner)
         spinner = TTY::Spinner.new("[:spinner] Rate limit resets in #{client.rate_limit.resets_in + 5} seconds ...", format: :classic)
         spinner.auto_spin
 
-        sleep(client.rate_limit.resets_in + 5)
+        sleep(client.rate_limit.resets_in + 5) # + 5 seconds cooldown
 
         spinner.success
     end

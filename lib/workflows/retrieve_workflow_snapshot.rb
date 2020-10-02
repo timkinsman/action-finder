@@ -5,8 +5,8 @@ require 'fileutils'
 require 'octokit'
 require 'tty-spinner'
 
-require_relative 'util/authenticate'
-require_relative 'util/check_rate_limit'
+require_relative '../util/authenticate'
+require_relative '../util/check_rate_limit'
 
 def find_workflows(user, pass, input, output, dir)
   client = authenticate(user, pass)
@@ -21,27 +21,28 @@ def find_workflows(user, pass, input, output, dir)
         client = authenticate(user, pass)
         check_rate_limit(client, 0, spinner)
 
-        if client.repository?(row[0])
-          workflows = client.contents(row[0], path: '.github/workflows')
-          workflow_arr = []
-          workflows.each do |wf|
-            next if !(File.extname(wf.name) == '.yml' || File.extname(wf.name) == '.yaml') # next if not a workflow file
-            workflow_arr << wf.name
-
-            begin
-              FileUtils.mkdir_p "#{dir}/#{row[0]}" unless File.exist?("#{dir}/#{row[0]}")
-              download = URI.open(wf.download_url)
-              IO.copy_stream(download, "#{dir}/#{row[0]}/#{wf.name}")
-            rescue StandardError
-              next
-            end
-            
-          end
-          csv << [row[0], workflow_arr, workflow_arr.length] unless workflow_arr.empty?
-        else
+        unless client.repository?(row[0]) # unless repository exists
           spinner.error
           next
         end
+
+        workflows = client.contents(row[0], path: '.github/workflows')
+        workflow_files = []
+
+        workflows.each do |workflow|
+          next unless File.extname(workflow.name) == '.yml' or File.extname(workflow.name) == '.yaml' # next unless a workflow file
+
+          workflow_files << workflow.name
+          begin
+            FileUtils.mkdir_p "#{dir}/#{row[0]}" unless File.exist?("#{dir}/#{row[0]}")
+            file = URI.open(workflow.download_url)
+            IO.copy_stream(file, "#{dir}/#{row[0]}/#{workflow.name}")
+          rescue StandardError # file does not exist
+            next
+          end
+        end
+
+        csv << [row[0], workflow_files, workflow_files.length] unless workflow_files.empty?
       rescue StandardError
         spinner.error
         next

@@ -26,9 +26,8 @@ def filter_dataset(input, output)
       "scorebased_utl",
       "randomforest_utl" # row[15]
     ]
-
     CSV.foreach(input, headers: true) do |row|
-      csv << row if row[13] == '1' || row[15] == '1'
+      csv << row if row[13] == '1' or row[15] == '1'
     end
   end
 

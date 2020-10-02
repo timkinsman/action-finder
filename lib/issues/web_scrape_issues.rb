@@ -5,24 +5,31 @@ require 'json'
 require 'mechanize'
 require 'tty-spinner'
 
-def issues_web_scraper(dir)
+def web_scrape_issues(input, output)
     agent = Mechanize.new
-    CSV.foreach("#{dir}/issues-subset.csv") do |row|
-        #spinner = TTY::Spinner.new("[:spinner] Checking if #{row[0]} has issues involving #{row[1]} ...", format: :classic)
-        #spinner.auto_spin
+    CSV.open(output, 'w') do |csv|
+        CSV.foreach(input) do |row|
+            spinner = TTY::Spinner.new("[:spinner] Checking if #{row[0]} has issues involving #{row[1]} ...", format: :classic)
+            spinner.auto_spin
 
-        begin
-            JSON.parse(row[2]).each do |url|            
+            JSON.parse(row[2]).each do |url|
                 next if url.include?('pull') # filter out pull requests
-                page = agent.get(url)
+
+                sleep(1)
+
+                begin
+                    page = agent.get(url)
+                rescue Mechanize::ResponseCodeError # 429 => Net::HTTPTooManyRequests
+                    spinner.error('429 => Net::HTTPTooManyRequests')
+                    sleep(60)
+                    agent = Mechanize.new
+                    redo
+                end
                 body = page.body.downcase
-                puts "#{row[0]} | #{row[1]} | #{url}" if [row[1], row[1].split('/')[-1], row[1].split('/')[-1], 'github action', 'github actions'].any? { |keyword| body.include? keyword }
+                csv << [row[0], row[1], url] if [row[1], 'github action', 'github actions'].any? { |keyword| body.include? keyword }
             end
-            #spinner.success
-        rescue StandardError => e
-            #spinner.error(e)
+
+            spinner.success
         end
     end
 end
-
-issues_web_scraper('data')
