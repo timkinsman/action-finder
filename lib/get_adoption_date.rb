@@ -2,7 +2,7 @@
 
 require 'csv'
 
-def get_six_months
+def get_adoption_date
     CSV.open('data/adoption_date.csv', 'w') do |csv|
         csv << ["repository", "workflow_adoption_date", "has_six_months"]
 
