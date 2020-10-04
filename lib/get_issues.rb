@@ -30,7 +30,7 @@ def get_issues(user, pass)
                         next
                     end
                     issues = []
-                    reponse.each do |issue|
+                    response.each do |issue|
                         issues << issue.html_url
                     end
                     next if issues.empty?

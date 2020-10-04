@@ -21,9 +21,18 @@ def get_diff(prev_file, next_file)
                 discard_action = true 
                 next
             end
+            if line.split('@')[0].include? '.' or !(line.split('@')[0].include? '/')
+                discard_action = true
+                next
+            end
             discard_action = false
 
-            diff_file << [line]
+            case line
+                when /^-/ then 
+                    line[0] = '*' # - collision issues
+                    diff_file << [line]
+                else diff_file << [line]
+            end
         end
 
         if line =~ /\swith:/ && discard_action == false
@@ -35,96 +44,77 @@ def get_diff(prev_file, next_file)
             diff_file << [line]
         end
     end
-
     diff_file
 end
 
+def add_hash(hash, action, key)
+    if hash[action].has_key? key
+        hash[action][key] += 1
+    else
+        hash[action][key] = 1
+    end
+end
+
+def minus_hash(hash, action, key)
+    hash[action][key] -= 1
+end
 
 def calculate_diff(prev_file, next_file, hash)
     diff_file = get_diff(prev_file, next_file)
 
-    added_n_times = []
-    removed_n_times = []
-    arugments_modified_n_times = []
-    version_changed_n_times = []
-
     action = ""
-    added_actions = []
+    actions_array = []
     arguments_modified = false
     existing_action = false
     possible_version_change = false
 
     diff_file.each do |line|
         is_with = true # assume it's a with block
+        verson_change = false
 
         if line[0] =~ /\suses:/
             is_with = false
-            action_split = action.split('@')[0].gsub('"', '') unless action.empty?
+            action_split = action.split('@')[0].gsub('"', '').gsub("'", '') unless action.empty?
 
             if arguments_modified == true
-                if hash[action_split].has_key? 'arugments_modified_n_times'
-                    hash[action_split]['arugments_modified_n_times'] = hash[action_split]['arugments_modified_n_times'] + 1
-                    added_actions << action_split
-                else
-                    hash[action_split]['arugments_modified_n_times'] = 1
-                    added_actions << action_split
-                end
+                add_hash(hash, action_split, 'arugments_modified_n_times')
                 arguments_modified = false
             end
 
             if possible_version_change && line[0].start_with?('+')
                 if action.split('@')[0] == line[0].gsub(/\s+/, "")[/(?<=uses:).*/].split('@')[0] && action != line[0].gsub(/\s+/, "")[/(?<=uses:).*/]
-                    if hash[action_split].has_key? 'version_changed_n_times'
-                        hash[action_split]['version_changed_n_times'] = hash[action_split]['version_changed_n_times'] + 1
-                        added_actions << action_split
-                    else
-                        hash[action_split]['version_changed_n_times'] = 1
-                        added_actions << action_split
-                    end
+                    add_hash(hash, action_split, 'version_changed_n_times')
+                    minus_hash(hash, action_split, 'removed_n_times')
                     possible_version_change = false
                     next
                 end
             end
 
             action = line[0].gsub(/\s+/, "")[/(?<=uses:).*/]
+            next if action.empty?
+            action_split = action.split('@')[0].gsub('"', '').gsub("'", '')
 
-            next if action.nil? or action.empty?
-            next if action.include?('.')
-
-            action_split = action.split('@')[0].gsub('"', '')
-
-            if line[0].start_with?('-')
+            if line[0].start_with?('*')
                 existing_action = false
                 possible_version_change = true
-                if hash[action_split].has_key? 'removed_n_times'
-                    hash[action_split]['removed_n_times'] = hash[action_split]['removed_n_times'] + 1
-                    added_actions << action_split
-                else
-                    hash[action_split]['removed_n_times'] = 1
-                    added_actions << action_split
-                end
+                add_hash(hash, action_split, 'removed_n_times')
             elsif line[0].start_with?('+')
                 existing_action = false
                 possible_version_change = false
-                if hash[action_split].has_key? 'added_n_times'
-                    hash[action_split]['added_n_times'] = hash[action_split]['added_n_times'] + 1
-                    added_actions << action_split
-                else
-                    hash[action_split]['added_n_times'] = 1
-                    added_actions << action_split
-                end
+                add_hash(hash, action_split, 'added_n_times')
+                actions_array << action_split
             else
                 existing_action = true
                 possible_version_change = false
             end
         end
 
-        if existing_action && is_with && (line[0].start_with?('-') || line[0].start_with?('+'))
+        if existing_action && is_with && (line[0].start_with?('*') || line[0].start_with?('+'))
             arguments_modified = true
         end
     end
 
-    added_actions.uniq
+    actions_array.uniq
 end
 
 def get_actions

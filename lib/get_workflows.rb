@@ -9,6 +9,7 @@ require_relative 'util/authenticate'
 require_relative 'util/check_rate_limit'
 
 def get_workflows(user, pass)
+  repository_does_not_exists = 0
   client = authenticate(user, pass)
 
   CSV.foreach('data/dataset_final.csv', headers: true) do |row|
@@ -19,7 +20,7 @@ def get_workflows(user, pass)
       client = authenticate(user, pass)
       check_rate_limit(client, 0, spinner)
 
-      if client.repository?(row[0])
+      if client.repository?(row[0]) # if repository exists
         workflows = client.contents(row[0], path: '.github/workflows')
 
         workflows.each do |workflow|
@@ -50,6 +51,7 @@ def get_workflows(user, pass)
         end
       else
         spinner.error
+        repository_does_not_exists =+ 1
         next
       end
     rescue StandardError
