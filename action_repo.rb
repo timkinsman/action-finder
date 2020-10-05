@@ -16,8 +16,8 @@ require_relative 'lib/time_series'
 # get_actions
 # web_scrape_actions
 
-get_issues ARGV[0], ARGV[1]
-web_scrape_issues
+# get_issues ARGV[0], ARGV[1]
+# web_scrape_issues
 
 # get_adoption_date
-# time_series ARGV[0], ARGV[1]
+time_series ARGV[0], ARGV[1]

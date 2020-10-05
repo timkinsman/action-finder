@@ -24,7 +24,7 @@ def web_scrape_issues
                     redo
                 end
                 body = page.body.downcase
-                csv << [row[0], row[1], url] if body.include? row[1] # [row[1].split('/')[1], 'github action', 'github actions'].any? { |keyword| body.include? keyword }
+                csv << [row[0], row[1], url] if [row[1], 'github action'].any? { |keyword| body.include? keyword }
             end
 
             spinner.success
