@@ -124,9 +124,7 @@ def get_actions
     hash = Hash.new{ |h, k| h[k] = Hash.new(&h.default_proc) }
     temp = Tempfile.new
 
-    count_GitHub_Actions_users = 0
-
-    CSV.open('data/has_actions.csv', 'w') do |csv|
+    CSV.open('data/actions_used.csv', 'w') do |csv|
         csv << ['repository', "actions"]
 
         Dir.foreach('data/workflows') do |user|
@@ -135,7 +133,6 @@ def get_actions
             Dir.foreach("data/workflows/#{user}") do |repo|
                 next if repo == '.' or repo == '..'
                 actions = []
-                count_GitHub_Actions_users += 1
 
                 Dir.foreach("data/workflows/#{user}/#{repo}") do |workflows|
                     next if workflows == '.' or workflows == '..'
@@ -173,6 +170,4 @@ def get_actions
     end
 
     spinner.success
-
-    puts "GitHub Actions users - #{count_GitHub_Actions_users}"
 end

@@ -25,7 +25,7 @@ def get_adoption_date
                     end
                 end
 
-                date = Time.new().to_datetime << 6
+                date = Time.new().to_datetime - ((6*30) + 15) # - 6 months and instability period
                 has_six_months = true if Date.parse(workflow_dates.min) < Date.parse("#{date.year}-#{date.month}-#{date.day}")
                 csv << ["#{user}/#{repo}", workflow_dates.min, has_six_months]
             end
