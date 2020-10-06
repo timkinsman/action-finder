@@ -108,14 +108,14 @@ def time_series(user, pass)
                         pr_row << client.search_issues("repo:#{row[0]} is:pr is:open created:<#{date_points}").total_count
                         sleep(2) # 30 search calls per minute
                     end
-                    points.each do |date_points|
-                        pr_row << client.search_issues("repo:#{row[0]} is:pr is:merged created:<#{date_points}").total_count
-                        sleep(2) # 30 search calls per minute
-                    end
-                    points.each do |date_points|
-                        pr_row << client.search_issues("repo:#{row[0]} is:pr is:unmerged created:<#{date_points}").total_count
-                        sleep(2) # 30 search calls per minute
-                    end
+                    #points.each do |date_points|
+                    #    pr_row << client.search_issues("repo:#{row[0]} is:pr is:merged created:<#{date_points}").total_count
+                    #    sleep(2) # 30 search calls per minute
+                    #end
+                    #points.each do |date_points|
+                    #    pr_row << client.search_issues("repo:#{row[0]} is:pr is:unmerged created:<#{date_points}").total_count
+                    #    sleep(2) # 30 search calls per minute
+                    #end
                     ts_pull << pr_row
                 rescue => e # repository does not exist
                     # puts e
