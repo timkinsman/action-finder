@@ -21,7 +21,7 @@ def web_scrape_issues
                     redo
                 end
 
-                csv << [row[0], url] if ['github action', 'github actions', 'github-action', 'github-actions'].any? { |keyword| page.body.downcase.include? keyword }
+                csv << [row[0], url] if ['github action', 'github actions'].any? { |keyword| page.body.downcase.include? keyword }
             end
 
             spinner.success

@@ -16,7 +16,7 @@ def get_issues(user, pass)
             spinner = TTY::Spinner.new("[:spinner] Checking if #{row[0]} has issues involving GitHub Actions ...", format: :classic)
             spinner.auto_spin
             client = authenticate(user, pass)
-            check_rate_limit(client, 50, spinner) # 50 call buffer
+            check_rate_limit(client, 50, spinner) # 10 call buffer
             
             begin
                 response = client.search_issues("\"github action\" OR \"github actions\" repo:#{row[0]} is:issue comments:>0 updated:>=2019-11-13").items

@@ -44,6 +44,7 @@ def get_diff(prev_file, next_file)
             diff_file << [line]
         end
     end
+    
     diff_file
 end
 
@@ -77,14 +78,14 @@ def calculate_diff(prev_file, next_file, hash)
             action_split = action.split('@')[0].gsub('"', '').gsub("'", '') unless action.empty?
 
             if arguments_modified == true
-                add_hash(hash, action_split, 'arugments_modified_n_times')
+                add_hash(hash, action_split, 'modifed')
                 arguments_modified = false
             end
 
             if possible_version_change && line[0].start_with?('+')
                 if action.split('@')[0] == line[0].gsub(/\s+/, "")[/(?<=uses:).*/].split('@')[0] && action != line[0].gsub(/\s+/, "")[/(?<=uses:).*/]
-                    add_hash(hash, action_split, 'version_changed_n_times')
-                    minus_hash(hash, action_split, 'removed_n_times')
+                    add_hash(hash, action_split, 'version_changed')
+                    minus_hash(hash, action_split, 'removed')
                     possible_version_change = false
                     next
                 end
@@ -97,11 +98,11 @@ def calculate_diff(prev_file, next_file, hash)
             if line[0].start_with?('*')
                 existing_action = false
                 possible_version_change = true
-                add_hash(hash, action_split, 'removed_n_times')
+                add_hash(hash, action_split, 'removed')
             elsif line[0].start_with?('+')
                 existing_action = false
                 possible_version_change = false
-                add_hash(hash, action_split, 'added_n_times')
+                add_hash(hash, action_split, 'added')
                 actions_array << action_split
             else
                 existing_action = true
@@ -155,17 +156,17 @@ def get_actions
     end
 
     hash.each do |h|
-        h[1]['added_n_times'] = 0 if h[1]['added_n_times'] == {}
-        h[1]['removed_n_times'] = 0 if h[1]['removed_n_times'] == {}
-        h[1]['arugments_modified_n_times'] = 0 if h[1]['arugments_modified_n_times'] == {}
-        h[1]['version_changed_n_times'] = 0 if h[1]['version_changed_n_times'] == {}
+        h[1]['added'] = 0 if h[1]['added'] == {}
+        h[1]['removed'] = 0 if h[1]['removed'] == {}
+        h[1]['modifed'] = 0 if h[1]['modifed'] == {}
+        h[1]['version_changed'] = 0 if h[1]['version_changed'] == {}
     end
 
 
     CSV.open('data/actions.csv', 'w') do |csv|
-        csv << ['action', 'added_n_times', 'removed_n_times', 'arugments_modified_n_times', 'version_changed_n_times']
+        csv << ['action', 'added', 'removed', 'modifed', 'version_changed']
         hash.each do |h|
-            csv << [h[0], h[1]['added_n_times'], h[1]['removed_n_times'], h[1]['arugments_modified_n_times'], h[1]['version_changed_n_times']]
+            csv << [h[0], h[1]['added'], h[1]['removed'], h[1]['modifed'], h[1]['version_changed']]
         end
     end
 

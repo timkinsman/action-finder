@@ -27,7 +27,7 @@ def get_workflows(user, pass)
           next unless File.extname(workflow.name) == '.yml' or File.extname(workflow.name) == '.yaml' # next unless a workflow file
 
           client = authenticate(user, pass)
-          check_rate_limit(client, 0, spinner)
+          check_rate_limit(client, 10, spinner) # 10 call buffer
           commits = client.commits(row[0], path: ".github/workflows/#{workflow.name}")
 
           client = authenticate(user, pass)

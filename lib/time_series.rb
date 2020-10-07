@@ -75,7 +75,7 @@ def time_series(user, pass)
                 spinner.auto_spin
 
                 client = authenticate(user, pass)
-                check_rate_limit(client, 50, spinner) # 50 call buffer
+                check_rate_limit(client, 10, spinner) # 10 call buffer
 
                 begin
                     date = DateTime.strptime(row[1], '%Y-%m-%d')
@@ -93,7 +93,6 @@ def time_series(user, pass)
                         date + ((30*4) + 15),
                         date + ((30*5) + 15),
                         date + ((30*6) + 15)]
-
                     issues_row = []
                     issues_row << row[0]
                     points.each do |date_points|
@@ -108,14 +107,14 @@ def time_series(user, pass)
                         pr_row << client.search_issues("repo:#{row[0]} is:pr is:open created:<#{date_points}").total_count
                         sleep(2) # 30 search calls per minute
                     end
-                    #points.each do |date_points|
-                    #    pr_row << client.search_issues("repo:#{row[0]} is:pr is:merged created:<#{date_points}").total_count
-                    #    sleep(2) # 30 search calls per minute
-                    #end
-                    #points.each do |date_points|
-                    #    pr_row << client.search_issues("repo:#{row[0]} is:pr is:unmerged created:<#{date_points}").total_count
-                    #    sleep(2) # 30 search calls per minute
-                    #end
+                    points.each do |date_points|
+                        pr_row << client.search_issues("repo:#{row[0]} is:pr is:merged created:<#{date_points}").total_count
+                        sleep(2) # 30 search calls per minute
+                    end
+                    points.each do |date_points|
+                        pr_row << client.search_issues("repo:#{row[0]} is:pr is:unmerged created:<#{date_points}").total_count
+                        sleep(2) # 30 search calls per minute
+                    end
                     ts_pull << pr_row
                 rescue => e # repository does not exist
                     # puts e
