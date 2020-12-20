@@ -7,15 +7,19 @@ require 'tty-spinner'
 require_relative 'util/authenticate'
 require_relative 'util/check_rate_limit'
 
-def median_of a       
-    return nil if a.empty?
+Dir[File.join(__dir__, 'ts', '*.rb')].each { |file| require file }
+
+def median_of a 
+    return 0.0 if a.empty?
     sorted = a.sort
     len = sorted.length
     (sorted[(len - 1) / 2] + sorted[len / 2]) / 2.0 
 end 
 
-def time_series(user, pass)
-    client = authenticate(user, pass)
+def time_series(token)
+    client = authenticate(token)
+
+    client.auto_paginate = true
 
     CSV.open('data/time_series.csv', 'w') do |ts|
         ts << [
@@ -45,8 +49,8 @@ def time_series(user, pass)
             "bot_comments",
             "bot_y",
             "sum",
-            "_merge"
-        ]
+            "_merge"]
+
         CSV.foreach('data/adoption_date.csv', headers: true).with_index do |row, i|
             next row if row[2] == 'false' # No 6 month period
 
@@ -68,90 +72,62 @@ def time_series(user, pass)
                     date + ((30*3) + 15),
                     date + ((30*4) + 15),
                     date + ((30*5) + 15),
-                    date + ((30*6) + 15)
-                ]
+                    date + ((30*6) + 15)]
+
+                lang = CSV.foreach('data/dataset_final.csv').select{ |data| data[0] == row[0] }[0][1]
+                commits = client.contribs(row[0]).map { |item| item.contributions }.sum
+                age_at_bot = pr_age(token, spinner, row[0], date)
+
                 12.times do |i|
-                    client = authenticate(user, pass)
+                    client = authenticate(token)
                     check_rate_limit(client, 10, spinner) # 10 call buffer
+
+                    client.auto_paginate = true
 
                     time_after = i + 1 - 6
                     time_after = 0 if time_after < 0
 
-                    ###
-                    #  Merged PRs
-                    #
-
-                    merged = client.search_issues("repo:#{row[0]} is:pr is:merged closed:#{points[i]}..#{points[i + 1]}")
+                    merged = client.search_issues("repo:#{row[0]} is:pr is:merged closed:#{points[i]}..#{points[i + 1]}").items
                     sleep(3)
-
-                    merged_total_count = merged.total_count
-                    merged_items = merged.items
-                    merged_median_comments = median_of(merged_items.map { |item| item.comments })
-                    merged_pr_authors = (merged_items.map { |item| item.user.login })
-
-
-                    merged_created_at = merged_items.map { |item| item.created_at }
-                    merged_closed_at = merged_items.map { |item| item.closed_at }
-
-                    arr_merged_time = []
-                    merged_created_at.select.each_with_index { |item, index| arr_merged_time << ((merged_closed_at[index].to_time - item.to_time) / 3600).round }
-                    merged_time = median_of arr_merged_time
-
-                    ###
-                    #  Nonmerged PRs
-                    #
                     
-                    nonmerged = client.search_issues("repo:#{row[0]} is:pr is:unmerged closed:#{points[i]}..#{points[i + 1]}")
+                    nonmerged = client.search_issues("repo:#{row[0]} is:pr is:unmerged closed:#{points[i]}..#{points[i + 1]}").items
                     sleep(3)
 
-                    nonmerged_total_count = nonmerged.total_count
-                    nonmerged_items = nonmerged.items
-                    nonmerged_median_comments = median_of(nonmerged_items.map { |item| item.comments })
-                    nonmerged_pr_authors = (nonmerged_items.map { |item| item.user.login })
-
-                    nonmerged_created_at = nonmerged_items.map { |item| item.created_at }
-                    nonmerged_closed_at = nonmerged_items.map { |item| item.closed_at }
-
-                    arr_nonmerged_time = []
-                    nonmerged_created_at.select.each_with_index { |item, index| arr_nonmerged_time << ((nonmerged_closed_at[index].to_time - item.to_time) / 3600).round }
-                    nonmerged_time = median_of arr_nonmerged_time
-
-                    ###
-
-                    total_num_pr_authors = ((merged_pr_authors + nonmerged_pr_authors).uniq).count
+                    opened = client.search_issues("repo:#{row[0]} is:pr created:#{points[i]}..#{points[i + 1]}").total_count
+                    sleep(3)
 
                     ts << [
                         row[0].split('/')[0],
                         row[0].split('/')[1],
-                        '',
+                        '', # bot_x
                         points[i].strftime("%Y-%m-%d"),
                         points[i + 1].strftime("%Y-%m-%d"),
                         i + 1,
                         (points[i] >= date).to_s.upcase,
                         time_after,
-                        merged_total_count,
-                        nonmerged_total_count,
-                        merged_median_comments,
-                        nonmerged_median_comments,
-                        merged_time,
-                        nonmerged_time,
-                        0,
-                        0,
-                        '',
-                        total_num_pr_authors,
-                        '',
-                        '',
-                        0,
+                        merged.count,
+                        nonmerged.count,
+                        median_of(pr_comments(merged)),
+                        median_of(pr_comments(nonmerged)),
+                        median_of(pr_time_to(pr_created_at(merged), pr_closed_at(merged))),
+                        median_of(pr_time_to(pr_created_at(nonmerged), pr_closed_at(nonmerged))),
+                        median_of(pr_commits(token, spinner, row[0], merged)),
+                        median_of(pr_commits(token, spinner, row[0], nonmerged)),
+                        lang,
+                        (pr_authors(merged) + pr_authors(nonmerged)).uniq.count,
+                        commits,
+                        opened,
+                        age_at_bot,
                         row[0],
                         i + 1,
-                        0,
-                        '',
-                        '',
-                        'left_only'
-                    ]
+                        0, # bot_comments
+                        '', # bot_y
+                        0, # sum
+                        'left_only']
+
                 end
             rescue => e # repository no longer exist
-                 puts e
+                #puts e
                 spinner.error
                 next
             end

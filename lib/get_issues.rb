@@ -8,14 +8,14 @@ require 'tty-spinner'
 require_relative 'util/authenticate'
 require_relative 'util/check_rate_limit'
 
-def get_issues(user, pass)
-    client = authenticate(user, pass)
+def get_issues(token)
+    client = authenticate(token)
 
     CSV.open("data/issues.csv", 'w') do |csv|
         CSV.foreach('data/actions_used.csv', headers: true) do |row|
             spinner = TTY::Spinner.new("[:spinner] Checking if #{row[0]} has issues involving GitHub Actions ...", format: :classic)
             spinner.auto_spin
-            client = authenticate(user, pass)
+            client = authenticate(token)
             check_rate_limit(client, 50, spinner) # 10 call buffer
             
             begin

@@ -8,16 +8,16 @@ require 'tty-spinner'
 require_relative 'util/authenticate'
 require_relative 'util/check_rate_limit'
 
-def get_workflows(user, pass)
+def get_workflows(token)
   repository_does_not_exists = 0
-  client = authenticate(user, pass)
+  client = authenticate(token)
 
   CSV.foreach('data/dataset_final.csv', headers: true) do |row|
     spinner = TTY::Spinner.new("[:spinner] Get #{row[0]} workflows ...", format: :classic)
     spinner.auto_spin
 
     begin
-      client = authenticate(user, pass)
+      client = authenticate(token)
       check_rate_limit(client, 0, spinner)
 
       if client.repository?(row[0]) # if repository exists
@@ -26,11 +26,11 @@ def get_workflows(user, pass)
         workflows.each do |workflow|
           next unless File.extname(workflow.name) == '.yml' or File.extname(workflow.name) == '.yaml' # next unless a workflow file
 
-          client = authenticate(user, pass)
+          client = authenticate(token)
           check_rate_limit(client, 10, spinner) # 10 call buffer
           commits = client.commits(row[0], path: ".github/workflows/#{workflow.name}")
 
-          client = authenticate(user, pass)
+          client = authenticate(token)
           check_rate_limit(client, commits.count, spinner)
 
           commits.reverse_each do |commit|

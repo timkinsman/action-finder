@@ -2,8 +2,8 @@
 
 require 'octokit'
 
-def authenticate(user, pass)
-  client = Octokit::Client.new(login: user, password: pass)
+def authenticate(token)
+  client = Octokit::Client.new(access_token: token)
   begin
     client.user
   rescue StandardError

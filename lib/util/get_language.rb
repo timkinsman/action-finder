@@ -10,7 +10,7 @@ def get_lang
     language.each do |lang|
         spinner = TTY::Spinner.new("[:spinner] Get #{lang} ...", format: :classic)
 
-        CSV.open("data//language/all_#{lang}.csv", 'w') do |csv|
+        CSV.open("data/language/all_#{lang}.csv", 'w') do |csv|
             csv << CSV.read("data/all_final.csv", headers: true).headers
 
             CSV.foreach('data/all_final.csv') do |row|
