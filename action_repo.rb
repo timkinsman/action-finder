@@ -1,13 +1,6 @@
 # frozen_string_literal: true
 
-require_relative 'lib/get_dataset'
-require_relative 'lib/get_workflows'
-require_relative 'lib/get_actions'
-require_relative 'lib/web_scrape_actions'
-require_relative 'lib/get_issues'
-require_relative 'lib/web_scrape_issues'
-require_relative 'lib/get_adoption_date'
-require_relative 'lib/time_series'
+Dir[File.join(__dir__, 'lib', '*.rb')].each { |file| require file }
 
 #get_dataset
 
