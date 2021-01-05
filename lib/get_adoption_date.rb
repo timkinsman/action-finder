@@ -1,33 +1,49 @@
 # frozen_string_literal: true
 
 require 'csv'
+require 'date'
 
 def get_adoption_date
     CSV.open('data/adoption_date.csv', 'w') do |csv|
-        csv << ["repository", "workflow_adoption_date", "has_six_months"]
+        csv << ["repository", "action", "primary_category", "secondary_category", "action_adoption_date", "current_date", "six_month_period"]
 
         Dir.foreach('data/workflows') do |user|
             next if user == '.' or user == '..'
 
             Dir.foreach("data/workflows/#{user}") do |repo|
                 next if repo == '.' or repo == '..'
-                has_six_months = false
                 workflow_dates = []
+                actions_used = []
+                six_month_period = false
 
-                Dir.foreach("data/workflows/#{user}/#{repo}") do |workflows|
-                    next if workflows == '.' or workflows == '..'
+                CSV.foreach('data/actions_used.csv') do |row|
+                    actions_used = JSON.parse(row[1]) if row[0] == "#{user}/#{repo}"
+                end 
 
-                    Dir.foreach("data/workflows/#{user}/#{repo}/#{workflows}") do |workflow|
-                        next if workflow == '.' or workflow == '..'
-                        workflow_dates << workflow[0..9]
-                        break
+                actions_used.each do |action|
+                    Dir.foreach("data/workflows/#{user}/#{repo}") do |workflows|
+                        next if workflows == '.' or workflows == '..'
 
+                        Dir.foreach("data/workflows/#{user}/#{repo}/#{workflows}") do |workflow|
+                            next if workflow == '.' or workflow == '..'
+                            if File.readlines("data/workflows/#{user}/#{repo}/#{workflows}/#{workflow}").any?{|line| line.include?(action)}
+                                workflow_dates << workflow[0..9]
+                                break
+                            end
+
+                        end
                     end
-                end
 
-                date = Time.new().to_datetime - ((6*30) + 15) # - 6 months and instability period
-                has_six_months = true if Date.parse(workflow_dates.min) < Date.parse("#{date.year}-#{date.month}-#{date.day}")
-                csv << ["#{user}/#{repo}", workflow_dates.min, has_six_months]
+                    current_date = DateTime.now - ((6*30) + 15) # 6 months and instability period
+                    six_month_period = true if DateTime.strptime(workflow_dates.min, '%Y-%m-%d') < current_date
+
+                    action_category = ""
+                    CSV.foreach('data/actions_final.csv') do |row|
+                        action_category = row[1].split(", ") if row[0] == action
+                    end
+
+                    csv << ["#{user}/#{repo}", action, action_category[0], action_category[1], workflow_dates.min, DateTime.now, six_month_period]
+                end
             end
         end
     end

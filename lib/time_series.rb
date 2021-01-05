@@ -25,7 +25,7 @@ def time_series(token)
         ts << [
             "owner",
             "repo",
-            "bot_x",
+            "action",
             "month_start",
             "month_end",
             "time",
@@ -47,18 +47,18 @@ def time_series(token)
             "name",
             "index",
             "bot_comments",
-            "bot_y",
-            "sum",
+            "action_primary_category",
+            "action_secondary_category",
             "_merge"]
 
         CSV.foreach('data/adoption_date.csv', headers: true).with_index do |row, i|
-            next row if row[2] == 'false' # No 6 month period
+            next row if row[4] == 'false' # No 6 month period
 
-            spinner = TTY::Spinner.new("[:spinner] #{row[0]} time series ...", format: :classic)
+            spinner = TTY::Spinner.new("[:spinner] #{row[0]}, #{row[1]} time series ...", format: :classic)
             spinner.auto_spin
 
             begin
-                date = DateTime.strptime(row[1], '%Y-%m-%d')
+                date = DateTime.strptime(row[4], '%Y-%m-%d')
                 points = [
                     date - ((30*6) + 15),
                     date - ((30*5) + 15),
@@ -99,7 +99,7 @@ def time_series(token)
                     ts << [
                         row[0].split('/')[0],
                         row[0].split('/')[1],
-                        '', # bot_x
+                        row[1],
                         points[i].strftime("%Y-%m-%d"),
                         points[i + 1].strftime("%Y-%m-%d"),
                         i + 1,
@@ -121,8 +121,8 @@ def time_series(token)
                         row[0],
                         i + 1,
                         0, # bot_comments
-                        '', # bot_y
-                        0, # sum
+                        row[2],
+                        row[3],
                         'left_only']
 
                 end
