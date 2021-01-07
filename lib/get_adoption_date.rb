@@ -34,15 +34,14 @@ def get_adoption_date
                         end
                     end
 
-                    current_date = DateTime.now - ((6*30) + 15) # 6 months and instability period
-                    six_month_period = true if DateTime.strptime(workflow_dates.min, '%Y-%m-%d') < current_date
+                    current_date = DateTime.now - 7*30 # 6 months and instability period
 
                     action_category = ""
                     CSV.foreach('data/actions_final.csv') do |row|
                         action_category = row[1].split(", ") if row[0] == action
                     end
 
-                    csv << ["#{user}/#{repo}", action, action_category[0], action_category[1], workflow_dates.min, DateTime.now, six_month_period]
+                    csv << ["#{user}/#{repo}", action, action_category[0], action_category[1], workflow_dates.min, DateTime.now] if DateTime.strptime(workflow_dates.min, '%Y-%m-%d') < current_date
                 end
             end
         end

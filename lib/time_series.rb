@@ -52,49 +52,51 @@ def time_series(token)
             "_merge"]
 
         CSV.foreach('data/adoption_date.csv', headers: true).with_index do |row, i|
-            next row if row[4] == 'false' # No 6 month period
-
             spinner = TTY::Spinner.new("[:spinner] #{row[0]}, #{row[1]} time series ...", format: :classic)
             spinner.auto_spin
 
             begin
                 date = DateTime.strptime(row[4], '%Y-%m-%d')
                 points = [
-                    date - ((30*6) + 15),
-                    date - ((30*5) + 15),
-                    date - ((30*4) + 15),
-                    date - ((30*3) + 15),
-                    date - ((30*2) + 15),
-                    date - ((30*1) + 15),
+                    date - ((30*6)),
+                    date - ((30*5)),
+                    date - ((30*4)),
+                    date - ((30*3)),
+                    date - ((30*2)),
+                    date - ((30*1)),
                     date,
-                    date + ((30*1) + 15),
-                    date + ((30*2) + 15),
-                    date + ((30*3) + 15),
-                    date + ((30*4) + 15),
-                    date + ((30*5) + 15),
-                    date + ((30*6) + 15)]
+                    date + ((30*1)),
+                    date + ((30*2)),
+                    date + ((30*3)),
+                    date + ((30*4)),
+                    date + ((30*5)),
+                    date + ((30*6)),
+                    date + ((30*7))
+                ]
 
                 lang = CSV.foreach('data/dataset_final.csv').select{ |data| data[0] == row[0] }[0][1]
                 commits = client.contribs(row[0]).map { |item| item.contributions }.sum
-                age_at_bot = pr_age(token, spinner, row[0], date)
 
-                12.times do |i|
+                age_at_bot = pr_age(token, spinner, row[0], date)
+                age_at_bot = 0 if age_at_bot < 0
+
+                13.times do |i|
                     client = authenticate(token)
                     check_rate_limit(client, 10, spinner) # 10 call buffer
 
                     client.auto_paginate = true
 
-                    time_after = i + 1 - 6
+                    time_after = i - 5
                     time_after = 0 if time_after < 0
 
                     merged = client.search_issues("repo:#{row[0]} is:pr is:merged closed:#{points[i]}..#{points[i + 1]}").items
-                    sleep(3)
+                    sleep(2)
                     
                     nonmerged = client.search_issues("repo:#{row[0]} is:pr is:unmerged closed:#{points[i]}..#{points[i + 1]}").items
-                    sleep(3)
+                    sleep(2)
 
                     opened = client.search_issues("repo:#{row[0]} is:pr created:#{points[i]}..#{points[i + 1]}").total_count
-                    sleep(3)
+                    sleep(2)
 
                     ts << [
                         row[0].split('/')[0],
@@ -114,7 +116,7 @@ def time_series(token)
                         median_of(pr_commits(token, spinner, row[0], merged)),
                         median_of(pr_commits(token, spinner, row[0], nonmerged)),
                         lang,
-                        (pr_authors(merged) + pr_authors(nonmerged)).uniq.count,
+                        'TO_BE_ADDED',
                         commits,
                         opened,
                         age_at_bot,
