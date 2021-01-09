@@ -34,7 +34,7 @@ def get_adoption_date
                         end
                     end
 
-                    current_date = DateTime.now - 7*30 # 6 months and instability period
+                    current_date = DateTime.now << 7 # 6 months and instability period
 
                     action_category = ""
                     CSV.foreach('data/actions_final.csv') do |row|

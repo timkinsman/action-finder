@@ -58,20 +58,20 @@ def time_series(token)
             begin
                 date = DateTime.strptime(row[4], '%Y-%m-%d')
                 points = [
-                    date - ((30*6)),
-                    date - ((30*5)),
-                    date - ((30*4)),
-                    date - ((30*3)),
-                    date - ((30*2)),
-                    date - ((30*1)),
-                    date,
-                    date + ((30*1)),
-                    date + ((30*2)),
-                    date + ((30*3)),
-                    date + ((30*4)),
-                    date + ((30*5)),
-                    date + ((30*6)),
-                    date + ((30*7))
+                    (date << 7) - 15,
+                    (date << 6) - 15,
+                    (date << 5) - 15,
+                    (date << 4) - 15,
+                    (date << 3) - 15,
+                    (date << 2) - 15,
+                    (date << 1) - 15,
+                    (date >> 1) + 15,
+                    (date >> 2) + 15,
+                    (date >> 3) + 15,
+                    (date >> 4) + 15,
+                    (date >> 5) + 15,
+                    (date >> 6) + 15,
+                    (date >> 7) + 15
                 ]
 
                 lang = CSV.foreach('data/dataset_final.csv').select{ |data| data[0] == row[0] }[0][1]
@@ -86,7 +86,7 @@ def time_series(token)
 
                     client.auto_paginate = true
 
-                    time_after = i - 5
+                    time_after = i - 6
                     time_after = 0 if time_after < 0
 
                     merged = client.search_issues("repo:#{row[0]} is:pr is:merged closed:#{points[i]}..#{points[i + 1]}").items
@@ -116,7 +116,7 @@ def time_series(token)
                         median_of(pr_commits(token, spinner, row[0], merged)),
                         median_of(pr_commits(token, spinner, row[0], nonmerged)),
                         lang,
-                        'TO_BE_ADDED',
+                        '',
                         commits,
                         opened,
                         age_at_bot,

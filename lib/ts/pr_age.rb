@@ -28,7 +28,7 @@ def pr_age(token, spinner, repo, date)
                 next
             end
 
-            return ((date - DateTime.strptime(time.to_s, '%Y-%m-%d')).to_i / 30.4167).floor
+            return ((date - DateTime.strptime(time.to_s, '%Y-%m-%d')).to_i / 30.4167).round
         end
     end
 
