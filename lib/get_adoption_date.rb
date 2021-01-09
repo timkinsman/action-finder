@@ -5,7 +5,7 @@ require 'date'
 
 def get_adoption_date
     CSV.open('data/adoption_date.csv', 'w') do |csv|
-        csv << ["repository", "action", "primary_category", "secondary_category", "action_adoption_date", "current_date", "six_month_period"]
+        csv << ["repository", "action", "primary_category", "secondary_category", "action_adoption_date", "current_date"]
 
         Dir.foreach('data/workflows') do |user|
             next if user == '.' or user == '..'

@@ -21,7 +21,7 @@ def time_series(token)
 
     client.auto_paginate = true
 
-    CSV.open('data/time_series.csv', 'w') do |ts|
+    CSV.open('data/time_series.csv', 'a+') do |ts|
         ts << [
             "owner",
             "repo",
@@ -50,28 +50,46 @@ def time_series(token)
             "action_primary_category",
             "action_secondary_category",
             "_merge"]
+    end
 
-        CSV.foreach('data/adoption_date.csv', headers: true).with_index do |row, i|
-            spinner = TTY::Spinner.new("[:spinner] #{row[0]}, #{row[1]} time series ...", format: :classic)
-            spinner.auto_spin
+    tmp = []
 
+    CSV.foreach('data/adoption_date.csv', headers: true).with_index do |row, i|
+        spinner = TTY::Spinner.new("[:spinner] #{row[0]}, #{row[1]} time series ...", format: :classic)
+        spinner.auto_spin
+
+        if !tmp.empty? && row[0] == tmp[-1][21] && ((DateTime.strptime(row[4], '%Y-%m-%d') >> 6) - 15) == DateTime.strptime(tmp[-1][3], '%Y-%m-%d')
+            CSV.open('data/time_series.csv', 'a+') do |ts|
+                tmp.each do |tmprow|
+                    tmprow[0] = row[0].split('/')[0]
+                    tmprow[1] = row[0].split('/')[1]
+                    tmprow[2] = row[1]
+                    tmprow[21] = row[0]
+                    tmprow[24] = row[2]
+                    tmprow[25] = row[3]
+                    
+                    ts << tmprow
+                end
+            end
+        else
+            tmp = []
             begin
                 date = DateTime.strptime(row[4], '%Y-%m-%d')
                 points = [
-                    (date << 7) - 15,
-                    (date << 6) - 15,
-                    (date << 5) - 15,
-                    (date << 4) - 15,
-                    (date << 3) - 15,
-                    (date << 2) - 15,
-                    (date << 1) - 15,
-                    (date >> 1) + 15,
-                    (date >> 2) + 15,
-                    (date >> 3) + 15,
-                    (date >> 4) + 15,
-                    (date >> 5) + 15,
-                    (date >> 6) + 15,
-                    (date >> 7) + 15
+                    (date << 7) + 15,
+                    (date << 6) + 15,
+                    (date << 5) + 15,
+                    (date << 4) + 15,
+                    (date << 3) + 15,
+                    (date << 2) + 15,
+                    (date << 1) + 15,
+                    (date >> 1) - 15,
+                    (date >> 2) - 15,
+                    (date >> 3) - 15,
+                    (date >> 4) - 15,
+                    (date >> 5) - 15,
+                    (date >> 6) - 15,
+                    (date >> 7) - 15
                 ]
 
                 lang = CSV.foreach('data/dataset_final.csv').select{ |data| data[0] == row[0] }[0][1]
@@ -98,15 +116,15 @@ def time_series(token)
                     opened = client.search_issues("repo:#{row[0]} is:pr created:#{points[i]}..#{points[i + 1]}").total_count
                     sleep(2)
 
-                    ts << [
+                    tmp << [
                         row[0].split('/')[0],
                         row[0].split('/')[1],
                         row[1],
                         points[i].strftime("%Y-%m-%d"),
                         points[i + 1].strftime("%Y-%m-%d"),
                         i + 1,
-                        (points[i] >= date).to_s.upcase,
-                        time_after,
+                        i == 6 ? '' : (points[i] >= date).to_s.upcase,
+                        i == 6 ? '' : time_after,
                         merged.count,
                         nonmerged.count,
                         median_of(pr_comments(merged)),
@@ -125,16 +143,21 @@ def time_series(token)
                         0, # bot_comments
                         row[2],
                         row[3],
-                        'left_only']
+                        'left_only']                  
 
+                end
+
+                CSV.open('data/time_series.csv', 'a+') do |ts|
+                    tmp.each do |tmprow|
+                        ts << tmprow
+                    end
                 end
             rescue => e # repository no longer exist
                 #puts e
                 spinner.error
                 next
             end
-
-            spinner.success
         end
+        spinner.success
     end
 end
