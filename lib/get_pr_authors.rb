@@ -16,7 +16,7 @@ def median_of a
     (sorted[(len - 1) / 2] + sorted[len / 2]) / 2.0 
 end 
 
-def time_series(token)
+def get_pr_authors(token)
     client = authenticate(token)
 
     client.auto_paginate = true
