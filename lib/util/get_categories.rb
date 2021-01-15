@@ -14,7 +14,6 @@ def get_categories
         ]
         CSV.foreach('data/actions_used.csv', headers:true) do |row|
             arrRow = [row[0], row[1], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            #actions = JSON.parse(row[1]).reject {|w| w == "actions/checkout" or w =~ /setup-/}
 
             actions = JSON.parse(row[1])
             actions.each do |action|
@@ -49,5 +48,3 @@ def get_categories
         end
     end
 end
-
-get_categories

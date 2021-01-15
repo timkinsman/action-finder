@@ -49,14 +49,31 @@ def time_series(token)
             "bot_comments",
             "action_primary_category",
             "action_secondary_category",
-            "_merge"]
+            "total_number_issues"]
     end
 
     tmp = []
+    total_number_pr_authors = 0
 
     CSV.foreach('data/adoption_date.csv', headers: true).with_index do |row, i|
         spinner = TTY::Spinner.new("[:spinner] #{row[0]}, #{row[1]} time series ...", format: :classic)
         spinner.auto_spin
+
+        begin
+            if tmp.empty? || row[0] != tmp[-1][21]
+                client = authenticate(token)
+                check_rate_limit(client, 50, spinner)
+
+                client.auto_paginate = true
+                opened = client.pull_requests(row[0], state: 'open')
+                closed = client.pull_requests(row[0], state: 'closed')
+                pr = opened + closed
+
+                total_number_pr_authors = pr_authors(pr).uniq.count
+            rescue => e
+                spinner.error('err: retriving total number of pr authors')
+                next
+        end
 
         if !tmp.empty? && row[0] == tmp[-1][21] && ((DateTime.strptime(row[4], '%Y-%m-%d') >> 6) - 15) == DateTime.strptime(tmp[-1][3], '%Y-%m-%d')
             CSV.open('data/time_series.csv', 'a+') do |ts|
@@ -72,7 +89,7 @@ def time_series(token)
                 end
             end
         else
-            tmp = []
+            tmp = [] # clear tmp
             begin
                 date = DateTime.strptime(row[4], '%Y-%m-%d')
                 points = [
@@ -134,27 +151,25 @@ def time_series(token)
                         median_of(pr_commits(token, spinner, row[0], merged)),
                         median_of(pr_commits(token, spinner, row[0], nonmerged)),
                         lang,
-                        '',
+                        total_number_pr_authors,
                         commits,
                         opened,
                         age_at_bot,
                         row[0],
                         i + 1,
-                        0, # bot_comments
+                        0,
                         row[2],
                         row[3],
-                        'left_only']                  
-
+                        'left_only']
                 end
 
                 CSV.open('data/time_series.csv', 'a+') do |ts|
-                    tmp.each do |tmprow|
-                        ts << tmprow
+                    tmp.each do |tr| # tmp row
+                        ts << tr
                     end
                 end
             rescue => e # repository no longer exist
-                #puts e
-                spinner.error
+                spinner.error('err: retriving repository')
                 next
             end
         end
