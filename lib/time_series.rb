@@ -70,6 +70,9 @@ def time_series(token)
                 pr = opened + closed
 
                 total_number_pr_authors = pr_authors(pr).uniq.count
+
+                total_number_issues = client.search_issues("repo:#{row[0]} is:issue").items
+                sleep(2)
             rescue => e
                 spinner.error('err: retriving total number of pr authors')
                 next
